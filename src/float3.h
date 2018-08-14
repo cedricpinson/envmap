@@ -1,37 +1,146 @@
 #pragma once
 
-#include <stdlib.h>
+#include <math.h>
 #include <float.h>
+#include <stdlib.h>
 
 // template
 
-struct double2
+template <typename T> struct Vec2Type
 {
-    double _v[2];
+    /** Data type of vector components.*/
+    typedef T value_type;
 
-    double2()
-        : _v{0, 0}
-    {}
-    double2(double x, double y)
-        : _v{x, y}
-    {}
+    /** Vec member variable. */
+    value_type _v[2];
 
-    inline double& operator[](int i) { return _v[i]; }
-    inline const double& operator[](int i) const { return _v[i]; }
+    /** Constructor that sets all components of the vector to zero */
+    Vec2Type()
+    {
+        _v[0] = 0.0;
+        _v[1] = 0.0;
+    }
+    Vec2Type(value_type x, value_type y)
+    {
+        _v[0] = x;
+        _v[1] = y;
+    }
+
+    inline bool operator==(const Vec2Type& v) const { return _v[0] == v._v[0] && _v[1] == v._v[1]; }
+
+    inline bool operator!=(const Vec2Type& v) const { return _v[0] != v._v[0] || _v[1] != v._v[1]; }
+
+    inline bool operator<(const Vec2Type& v) const
+    {
+        if (_v[0] < v._v[0])
+            return true;
+        else if (_v[0] > v._v[0])
+            return false;
+        else
+            return (_v[1] < v._v[1]);
+    }
+
+    inline value_type* ptr() { return _v; }
+    inline const value_type* ptr() const { return _v; }
+
+    inline void set(value_type x, value_type y)
+    {
+        _v[0] = x;
+        _v[1] = y;
+    }
+
+    inline value_type& operator[](int i) { return _v[i]; }
+    inline value_type operator[](int i) const { return _v[i]; }
+
+    inline value_type& x() { return _v[0]; }
+    inline value_type& y() { return _v[1]; }
+
+    inline value_type x() const { return _v[0]; }
+    inline value_type y() const { return _v[1]; }
+
+    /** Dot product. */
+    inline value_type operator*(const Vec2Type& rhs) const { return _v[0] * rhs._v[0] + _v[1] * rhs._v[1]; }
+
+    /** Multiply by scalar. */
+    inline const Vec2Type operator*(value_type rhs) const { return Vec2Type(_v[0] * rhs, _v[1] * rhs); }
+
+    /** Unary multiply by scalar. */
+    inline Vec2Type& operator*=(value_type rhs)
+    {
+        _v[0] *= rhs;
+        _v[1] *= rhs;
+        return *this;
+    }
+
+    /** Divide by scalar. */
+    inline const Vec2Type operator/(value_type rhs) const { return Vec2Type(_v[0] / rhs, _v[1] / rhs); }
+
+    /** Unary divide by scalar. */
+    inline Vec2Type& operator/=(value_type rhs)
+    {
+        _v[0] /= rhs;
+        _v[1] /= rhs;
+        return *this;
+    }
+
+    /** Binary vector add. */
+    inline const Vec2Type operator+(const Vec2Type& rhs) const
+    {
+        return Vec2Type(_v[0] + rhs._v[0], _v[1] + rhs._v[1]);
+    }
 
     /** Unary vector add. Slightly more efficient because no temporary
      * intermediate object.
      */
-    inline double2& operator+=(const double2& rhs)
+    inline Vec2Type& operator+=(const Vec2Type& rhs)
     {
         _v[0] += rhs._v[0];
         _v[1] += rhs._v[1];
         return *this;
     }
 
-    /** Multiply by scalar. */
-    inline const double2 operator*(float rhs) const { return double2(_v[0] * rhs, _v[1] * rhs); }
+    /** Binary vector subtract. */
+    inline const Vec2Type operator-(const Vec2Type& rhs) const
+    {
+        return Vec2Type(_v[0] - rhs._v[0], _v[1] - rhs._v[1]);
+    }
+
+    /** Unary vector subtract. */
+    inline Vec2Type& operator-=(const Vec2Type& rhs)
+    {
+        _v[0] -= rhs._v[0];
+        _v[1] -= rhs._v[1];
+        return *this;
+    }
+
+    /** Negation operator. Returns the negative of the Vec2Type. */
+    inline const Vec2Type operator-() const { return Vec2Type(-_v[0], -_v[1]); }
+
+    /** Length of the vector = sqrt( vec . vec ) */
+    inline value_type length() const { return sqrtf(_v[0] * _v[0] + _v[1] * _v[1]); }
+
+    /** Length squared of the vector = vec . vec */
+    inline value_type length2(void) const { return _v[0] * _v[0] + _v[1] * _v[1]; }
+
+    /** Normalize the vector so that it has length unity.
+     * Returns the previous length of the vector.
+     */
+    inline value_type normalize()
+    {
+        value_type norm = Vec2Type::length();
+        if (norm > 0.0)
+        {
+            value_type inv = 1.0f / norm;
+            _v[0] *= inv;
+            _v[1] *= inv;
+        }
+        return (norm);
+    }
 };
+
+typedef Vec2Type<float> float2;
+typedef Vec2Type<double> double2;
+
 
 template <typename T> struct Vec3Type
 {
@@ -40,6 +149,7 @@ template <typename T> struct Vec3Type
 
     value_type _v[3];
 
+    /** Constructor that sets all components of the vector to zero */
     Vec3Type()
         : _v{0, 0, 0}
     {}
@@ -47,8 +157,94 @@ template <typename T> struct Vec3Type
         : _v{x, y, z}
     {}
 
+    inline bool operator==(const Vec3Type& v) const { return _v[0] == v._v[0] && _v[1] == v._v[1] && _v[2] == v._v[2]; }
+
+    inline bool operator!=(const Vec3Type& v) const { return _v[0] != v._v[0] || _v[1] != v._v[1] || _v[2] != v._v[2]; }
+
+    inline bool operator<(const Vec3Type& v) const
+    {
+        if (_v[0] < v._v[0])
+            return true;
+        else if (_v[0] > v._v[0])
+            return false;
+        else if (_v[1] < v._v[1])
+            return true;
+        else if (_v[1] > v._v[1])
+            return false;
+        else
+            return (_v[2] < v._v[2]);
+    }
+
+    inline value_type* ptr() { return _v; }
+    inline const value_type* ptr() const { return _v; }
+
+    inline void set(value_type x, value_type y, value_type z)
+    {
+        _v[0] = x;
+        _v[1] = y;
+        _v[2] = z;
+    }
+
+    inline void set(const Vec3Type& rhs)
+    {
+        _v[0] = rhs._v[0];
+        _v[1] = rhs._v[1];
+        _v[2] = rhs._v[2];
+    }
+
     inline value_type& operator[](int i) { return _v[i]; }
-    inline const value_type& operator[](int i) const { return _v[i]; }
+    inline value_type operator[](int i) const { return _v[i]; }
+
+    inline value_type& x() { return _v[0]; }
+    inline value_type& y() { return _v[1]; }
+    inline value_type& z() { return _v[2]; }
+
+    inline value_type x() const { return _v[0]; }
+    inline value_type y() const { return _v[1]; }
+    inline value_type z() const { return _v[2]; }
+
+    /** Dot product. */
+    inline value_type operator*(const Vec3Type& rhs) const
+    {
+        return _v[0] * rhs._v[0] + _v[1] * rhs._v[1] + _v[2] * rhs._v[2];
+    }
+
+    /** Cross product. */
+    inline const Vec3Type operator^(const Vec3Type& rhs) const
+    {
+        return Vec3Type(_v[1] * rhs._v[2] - _v[2] * rhs._v[1], _v[2] * rhs._v[0] - _v[0] * rhs._v[2],
+                        _v[0] * rhs._v[1] - _v[1] * rhs._v[0]);
+    }
+
+    /** Multiply by scalar. */
+    inline const Vec3Type operator*(value_type rhs) const { return Vec3Type(_v[0] * rhs, _v[1] * rhs, _v[2] * rhs); }
+
+    /** Unary multiply by scalar. */
+    inline Vec3Type& operator*=(value_type rhs)
+    {
+        _v[0] *= rhs;
+        _v[1] *= rhs;
+        _v[2] *= rhs;
+        return *this;
+    }
+
+    /** Divide by scalar. */
+    inline const Vec3Type operator/(value_type rhs) const { return Vec3Type(_v[0] / rhs, _v[1] / rhs, _v[2] / rhs); }
+
+    /** Unary divide by scalar. */
+    inline Vec3Type& operator/=(value_type rhs)
+    {
+        _v[0] /= rhs;
+        _v[1] /= rhs;
+        _v[2] /= rhs;
+        return *this;
+    }
+
+    /** Binary vector add. */
+    inline const Vec3Type operator+(const Vec3Type& rhs) const
+    {
+        return Vec3Type(_v[0] + rhs._v[0], _v[1] + rhs._v[1], _v[2] + rhs._v[2]);
+    }
 
     /** Unary vector add. Slightly more efficient because no temporary
      * intermediate object.
@@ -61,18 +257,47 @@ template <typename T> struct Vec3Type
         return *this;
     }
 
-    /** Multiply by scalar. */
-    inline Vec3Type& operator*=(const value_type& rhs)
+    /** Binary vector subtract. */
+    inline const Vec3Type operator-(const Vec3Type& rhs) const
     {
-        _v[0] *= rhs;
-        _v[1] *= rhs;
-        _v[2] *= rhs;
+        return Vec3Type(_v[0] - rhs._v[0], _v[1] - rhs._v[1], _v[2] - rhs._v[2]);
+    }
+
+    /** Unary vector subtract. */
+    inline Vec3Type& operator-=(const Vec3Type& rhs)
+    {
+        _v[0] -= rhs._v[0];
+        _v[1] -= rhs._v[1];
+        _v[2] -= rhs._v[2];
         return *this;
     }
 
-    /** Multiply by scalar. */
-    inline const Vec3Type operator*(value_type rhs) const { return Vec3Type(_v[0] * rhs, _v[1] * rhs, _v[2] * rhs); }
-};
+    /** Negation operator. Returns the negative of the Vec3Type. */
+    inline const Vec3Type operator-() const { return Vec3Type(-_v[0], -_v[1], -_v[2]); }
+
+    /** Length of the vector = sqrt( vec . vec ) */
+    inline value_type length() const { return sqrtf(_v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2]); }
+
+    /** Length squared of the vector = vec . vec */
+    inline value_type length2() const { return _v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2]; }
+
+    /** Normalize the vector so that it has length unity.
+     * Returns the previous length of the vector.
+     */
+    inline value_type normalize()
+    {
+        value_type norm = Vec3Type::length();
+        if (norm > 0.0)
+        {
+            value_type inv = 1.0f / norm;
+            _v[0] *= inv;
+            _v[1] *= inv;
+            _v[2] *= inv;
+        }
+        return (norm);
+    }
+
+}; // end of class Vec3Type
 
 typedef Vec3Type<float> float3;
 typedef Vec3Type<double> double3;
@@ -215,7 +440,7 @@ template <typename T> struct Vec4Type
 typedef Vec4Type<float> float4;
 typedef Vec4Type<double> double4;
 
-inline double2 hammersley(uint32_t i, double inverseSampleCount)
+inline float2 hammersley(uint32_t i, double inverseSampleCount)
 {
 
     uint32_t bits = i;
@@ -226,5 +451,20 @@ inline double2 hammersley(uint32_t i, double inverseSampleCount)
     bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
     double y = double(bits) * 2.3283064365386963e-10; // / 0x100000000
 
-    return double2(double(i) * inverseSampleCount, y);
+    return float2(i * inverseSampleCount, y);
+}
+
+inline float D_GGX( float NdotH, float alpha)
+{
+    const float PI_INV = 1.0/M_PI;
+    // use GGX / Trowbridge-Reitz, same as Disney and Unreal 4
+    // cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+    float tmp = alpha / (NdotH*NdotH*(alpha*alpha-1.0)+1.0);
+    return tmp * tmp * PI_INV;
+}
+
+
+template <typename T>
+inline typename T::value_type dot( const T& a, const T& b ) {
+    return a * b;
 }

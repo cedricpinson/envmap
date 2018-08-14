@@ -38,7 +38,7 @@ struct Cubemap
     double3 getDirectionFor(Face face, int x, int y) const;
     double3 getDirectionFor(Face face, double x, double y) const;
     void setAllFacesFromCross(const Image& image);
-
+    void makeSeamless();
 };
 
 inline double3 Cubemap::getDirectionFor(Face face, int x, int y) const

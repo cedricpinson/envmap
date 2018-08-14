@@ -1,7 +1,7 @@
 #include "Cubemap.h"
+#include "Image.h"
 #include "Spherical.h"
 #include "envUtils.h"
-#include "Image.h"
 #include <getopt.h>
 #include <stdio.h>
 
@@ -19,6 +19,13 @@ int main(int argc, char** argv)
 
         envUtils::equirectangularToCubemap(cm, image);
         envUtils::writeCubemap_hdr("test", cm);
+
+        CubemapMipMap cmMipMap;
+        envUtils::createCubemapMipMap(cmMipMap, cm);
+        envUtils::writeCubemapMipMap_hdr("test", cmMipMap);
+
+        CubemapMipMap cmPrefilter;
+        envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, 512);
 
         envUtils::writeImage_hdr("./test.hdr", image);
 

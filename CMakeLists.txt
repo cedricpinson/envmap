@@ -9,7 +9,11 @@ find_package(TBB)
 
 include_directories( ${TBB_INCLUDE_DIR} "deps/" "src/")
 
-add_executable(envmap src/envmap.cpp src/envUtils.cpp src/computeSphericalHarmonicsFromCubemap.cpp src/Image.cpp src/Cubemap.cpp )
+add_executable(envmap src/envmap.cpp src/envUtils.cpp
+  src/computeSphericalHarmonicsFromCubemap.cpp
+  src/prefilterCubemapGGX.cpp
+  src/utils.cpp
+  src/Image.cpp src/Cubemap.cpp )
 
 target_link_libraries(envmap ${TBB_LIBRARIES})
 

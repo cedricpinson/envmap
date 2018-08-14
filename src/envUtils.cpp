@@ -2,9 +2,10 @@
 #include "Cubemap.h"
 #include "Spherical.h"
 #include "float3.h"
-#include "string.h"
 #include "utils.h"
+
 #include <math.h>
+#include <string.h>
 
 // create directory
 #include <sys/stat.h>
@@ -74,6 +75,8 @@ int writeSpherical_json(const char* outputFilename, double* spherical)
         printf("error writing file %s", outputFilename);
         return 1;
     }
+    fclose(fp);
+
     return 0;
 }
 
@@ -221,12 +224,7 @@ void freeCubemap(Cubemap& cm)
 
 void writeCubemap_hdr(const char* dir, const Cubemap& cm)
 {
-    struct stat st = {0};
-
-    if (stat(dir, &st) == -1)
-    {
-        mkdir(dir, 0700);
-    }
+    make_directory(dir);
 
     Path path;
     for (int f = 0; f < 6; f++)
@@ -278,7 +276,7 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
                 for (size_t sample = 0; sample < numSamples; sample++)
                 {
                     // Generate numSamples in our destination pixels and map them to input pixels
-                    const double2 h = hammersley(uint32_t(sample), iNumSamples);
+                    const float2 h = hammersley(size_t(sample), iNumSamples);
                     const double3 s(dst.getDirectionFor((Cubemap::Face)f, x + h[0], y + h[1]));
                     float xf = float(atan2(s[0], -s[2]) * M_1_PI); // range [-1.0, 1.0]
                     float yf = float(asin(-s[1]) * (2 * M_1_PI));  // range [-1.0, 1.0]
@@ -293,6 +291,62 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
             }
         }
     }
+}
+
+void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
+{
+    size_t scale = 2;
+    size_t dim = dst.size;
+    for (int f = 0; f < 6; f++)
+    {
+        const Image& srcFace = src.faces[f];
+
+        for (int y = 0; y < dim; y++)
+        {
+            float3* dstLine = &dst.faces[f].getPixel(0, y);
+            for (size_t x = 0; x < dim; ++x)
+            {
+                dstLine[x] = srcFace.filterAt(x * scale + 0.5, y * scale + 0.5);
+            }
+        }
+    }
+}
+
+void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
+{
+    size_t maxSize = cm.size;
+    size_t numMipMap = log2(maxSize);
+
+    cmMipMap.init(numMipMap);
+
+    // copy first level 0
+    envUtils::createCubemap(cmMipMap.levels[0], maxSize);
+    memcpy(cmMipMap.levels[0].image.data, cm.image.data, cm.image.width * cm.image.height * sizeof(float3));
+    cmMipMap.levels[0].makeSeamless();
+
+    for (size_t i = 1; i < numMipMap; i++)
+    {
+        size_t size = pow(2, numMipMap - i);
+        envUtils::createCubemap(cmMipMap.levels[i], size);
+        envUtils::downsampleCubemapLevelBoxFilter(cmMipMap.levels[i], cmMipMap.levels[i - 1]);
+        cmMipMap.levels[i].makeSeamless();
+    }
+}
+
+int writeCubemapMipMap_hdr(const char* dir, const CubemapMipMap& cm)
+{
+    make_directory(dir);
+
+    Path path;
+    char filename[256];
+    for (int i = 0; i < cm.numLevel; i++)
+    {
+        snprintf(filename, 255, "mipmap_level_%d", i);
+        create_path(path, dir, filename);
+        const Image& image = cm.levels[i].image;
+        writeImage_hdr(path, image);
+    }
+    return 0;
 }
 
 } // namespace envUtils

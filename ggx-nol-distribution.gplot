@@ -1,0 +1,33 @@
+set term unknown
+
+#stats filename
+
+# Add a vertical dotted line at x=0 to show centre (mean) of distribution.
+set yzeroaxis
+set title ""
+plot filename u 1:1 notitle
+
+
+xmax=1.0
+xminInput=GPVAL_DATA_X_MIN
+
+xmin=floor(1000.0*xminInput)/1000.0
+size=(xmax-xmin)/100.0
+
+# Each bar is half the (visual) width of its x-range.
+set style fill solid 0.5 #fillstyle
+set boxwidth size
+
+set xrange [xmin: xmax]
+
+set grid
+set term png size 800,480
+set output output_file
+
+graph(n) = sprintf("Distribution for %s samples",n)
+set title sprintf("%s",titleGraph)
+
+set key autotitle columnhead
+
+bin(x, s) = s*int(x/s)
+plot filename using (bin($1,size)):(1.0/numSample) smooth frequency with boxes notitle
