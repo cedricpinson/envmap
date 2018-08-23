@@ -1,8 +1,8 @@
 #include "utils.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 const char* get_filename_ext(const char* filename)
 {
@@ -26,7 +26,7 @@ void create_path(Path& path, const char* dir, const char* name)
 
 int make_directory(const char* dir)
 {
-    struct stat st = {0};
+    struct stat st{};
 
     if (stat(dir, &st) == -1)
     {

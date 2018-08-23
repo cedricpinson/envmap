@@ -76,9 +76,3 @@ inline void Cubemap::getDirectionFor(float3& direction, Face face, float x, floa
 
     direction *= 1 / l;
 }
-
-inline void Cubemap::getPixelFromDirection(float3& pixel, const float3& direction) const
-{
-
-    Cubemap::Address address = getAddressFor(direction);
-}

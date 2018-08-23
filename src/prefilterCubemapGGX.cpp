@@ -16,8 +16,8 @@ namespace envUtils {
 struct CacheEntry
 {
     float3 direction;
-    unsigned char l0, l1;
     float lerp;
+    unsigned char l0, l1;
 };
 struct CacheSample
 {
@@ -109,12 +109,12 @@ void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamp
             const double NoV = dot(N, V);
             const double LoH = dot(L, H);
 #else
-            const double NoV = 1;
+            // const double NoV = 1;
             const double NoH = H[2];
             const double NoH2 = NoH * NoH;
             const double NoL = 2 * NoH2 - 1;
             const double3 L(2 * NoH * H[0], 2 * NoH * H[1], NoL);
-            const double LoH = dot(L, H);
+            // const double LoH = dot(L, H);
 #endif
 
             if (NoL < 1.e-5)
@@ -267,13 +267,13 @@ void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1,
 }
 
 void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const CubemapMipMap* cubemapPtr,
-                         float roughnessLinear, const CacheSample* samplesPtr, int yStart, int yStop)
+                         const CacheSample* samplesPtr, int yStart, int yStop)
 {
     const CacheSample& samples = *samplesPtr;
     Cubemap& cubemapDest = *cubemapDestPtr;
     const CubemapMipMap& cubemap = *cubemapPtr;
 
-    size_t size = cubemapDest.size;
+    int size = cubemapDest.size;
     Image& face = cubemapDest.faces[faceIndex];
 
     float3 tangentX;
@@ -342,17 +342,10 @@ void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const
 }
 #define USE_THREAD
 
-void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap, float roughnessLinear,
-                   const CacheSample& samples, int nbThread = 0)
+void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap, const CacheSample& samples, int nbThread)
 {
     int nbLines = cubemapDest.size;
 #ifdef USE_THREAD
-    if (!nbThread)
-    {
-        nbThread = std::thread::hardware_concurrency();
-        printf("using %d threads\n", nbThread);
-    }
-
     std::thread threadList[64];
 
     if (nbThread > 64)
@@ -372,7 +365,7 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         if (stopY > nbLines - 1)
             stopY = nbLines - 1;
 
-        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, &cubemap, roughnessLinear, &samples,
+        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, &cubemap, &samples,
                                     startY, stopY);
 
         startY = stopY + 1;
@@ -383,16 +376,22 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         threadList[i].join();
     }
 #else
-    prefilterRangeLines(&cubemapDest, faceIndex, &cubemap, roughnessLinear, &samples, 0, nbLines - 1);
+    prefilterRangeLines(&cubemapDest, faceIndex, &cubemap, &samples, 0, nbLines - 1);
 #endif
 }
 
 void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_t numSamples)
 {
+    int nbThread;
+#ifdef USE_THREAD
+    nbThread = std::thread::hardware_concurrency();
+    printf("using %d threads\n", nbThread);
+#endif
+
     // build mipmap from cmSrc
-    size_t size = cmSrc.levels[0].size;
-    size_t maxMipMap = log2(size);
-    size_t numMipMap = maxMipMap + 1;
+    int size = cmSrc.levels[0].size;
+    int maxMipMap = log2(size);
+    int numMipMap = maxMipMap + 1;
 
     // init dest result
     cmDst.init(numMipMap);
@@ -427,9 +426,9 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
         // iterate on each face to compute ggx
         for (int face = 0; face < 6; face++)
         {
-            prefilterFace(cmDst.levels[mipLevel], (Cubemap::Face)face, cmSrc, roughnessLinear, cacheSamples);
+            prefilterFace(cmDst.levels[mipLevel], (Cubemap::Face)face, cmSrc, cacheSamples, nbThread);
         }
     }
-}
+} // namespace envUtils
 
 } // namespace envUtils

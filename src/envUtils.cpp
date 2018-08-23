@@ -91,7 +91,7 @@ int load_image_exr(const char* filename, Image& image)
         return 1;
     }
     float3* data = (float3*)malloc(image.width * image.height * sizeof(float3));
-    for (size_t i = 0; i < image.width * image.height; i++)
+    for (int i = 0; i < image.width * image.height; i++)
     {
         float3& texel = (float3&)data[i];
         texel[0] = rgba[i * 4];
@@ -243,7 +243,7 @@ void writeCubemap_hdr(const char* dir, const char* basename, const Cubemap& cm)
 
 void clampImage(Image& src, float maxValue)
 {
-    const size_t size = src.width * src.height;
+    const int size = src.width * src.height;
     float3* data = src.data;
     for (int i = 0; i < size; i++, data++)
     {
@@ -269,7 +269,7 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
         for (int y = 0; y < dim; y++)
         {
             float3* data = &face.getPixel(0, y);
-            for (size_t x = 0; x < dim; ++x, ++data)
+            for (int x = 0; x < dim; ++x, ++data)
             {
                 // calculate how many samples we need based on dx, dy in the source
                 // x =  cos(phi) sin(theta)
@@ -320,8 +320,8 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
 
 void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
 {
-    size_t scale = 2;
-    size_t dim = dst.size;
+    int scale = 2;
+    int dim = dst.size;
     for (int f = 0; f < 6; f++)
     {
         const Image& srcFace = src.faces[f];
@@ -329,7 +329,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
         for (int y = 0; y < dim; y++)
         {
             float3* dstLine = &dst.faces[f].getPixel(0, y);
-            for (size_t x = 0; x < dim; ++x)
+            for (int x = 0; x < dim; ++x)
             {
                 srcFace.filterAt(dstLine[x], x * scale + 0.5, y * scale + 0.5);
             }

@@ -9,6 +9,12 @@ int main(int argc, char** argv)
 {
     char* file = argv[1];
 
+    if (argc < 2)
+    {
+        printf("usage %s environment\n", argv[0]);
+        return 1;
+    }
+
     Image image;
 
     if (envUtils::loadImage(image, file) == 0)
