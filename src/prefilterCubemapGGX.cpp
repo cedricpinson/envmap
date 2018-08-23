@@ -266,10 +266,13 @@ void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1,
 #endif
 }
 
-void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const CubemapMipMap& cubemap,
-                         float roughnessLinear, const CacheSample& samples, int yStart, int yStop)
+void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const CubemapMipMap* cubemapPtr,
+                         float roughnessLinear, const CacheSample* samplesPtr, int yStart, int yStop)
 {
+    const CacheSample& samples = *samplesPtr;
     Cubemap& cubemapDest = *cubemapDestPtr;
+    const CubemapMipMap& cubemap = *cubemapPtr;
+
     size_t size = cubemapDest.size;
     Image& face = cubemapDest.faces[faceIndex];
 
@@ -339,32 +342,16 @@ void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const
 }
 #define USE_THREAD
 
-#ifdef USE_THREAD
-#if 0
-void threadLines(func, int nbThread, int nbLines)
-{
-    std::thread threadList[64];
-    if (nbThread > 64)
-        nbThread = 64;
-    for (int i = 0; i < nbThread; i++)
-    {
-        threadList[i] = std::thread(func, startLine, endLine);
-    }
-
-    for (int i = 0; i < nbThread; i++)
-    {
-        threadList[i].join();
-    }
-}
-#endif
-#endif
-
 void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap, float roughnessLinear,
-                   const CacheSample& samples, int nbThread = 1)
+                   const CacheSample& samples, int nbThread = 0)
 {
     int nbLines = cubemapDest.size;
-
 #ifdef USE_THREAD
+    if (!nbThread)
+    {
+        nbThread = std::thread::hardware_concurrency();
+        printf("using %d threads\n", nbThread);
+    }
 
     std::thread threadList[64];
 
@@ -385,7 +372,8 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         if (stopY > nbLines - 1)
             stopY = nbLines - 1;
 
-        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, cubemap, roughnessLinear, samples, startY, stopY);
+        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, &cubemap, roughnessLinear, &samples,
+                                    startY, stopY);
 
         startY = stopY + 1;
     }
@@ -395,7 +383,7 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         threadList[i].join();
     }
 #else
-    prefilterRangeLines(&cubemapDest, faceIndex, cubemap, roughnessLinear, samples, 0, nbLines - 1);
+    prefilterRangeLines(&cubemapDest, faceIndex, &cubemap, roughnessLinear, &samples, 0, nbLines - 1);
 #endif
 }
 
