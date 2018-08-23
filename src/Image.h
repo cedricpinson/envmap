@@ -15,7 +15,7 @@ struct Image
 
     float3& getPixel(int x, int y) { return data[x + y * rowInFloat3]; }
     const float3& getPixel(int x, int y) const { return data[x + y * rowInFloat3]; }
-    float3 filterAt(float x, float y) const
+    void filterAt(float3& pixel, float x, float y) const
     {
         const int x0 = (int)floor(x);
         const int y0 = (int)floor(y);
@@ -31,7 +31,7 @@ struct Image
         const float3& c1 = getPixel(x1, y0);
         const float3& c2 = getPixel(x0, y1);
         const float3& c3 = getPixel(x1, y1);
-        return c0 * (one_minus_u * one_minus_v) + c1 * (u * one_minus_v) + c2 * (one_minus_u * v) + c3 * (u * v);
+        pixel = c0 * (one_minus_u * one_minus_v) + c1 * (u * one_minus_v) + c2 * (one_minus_u * v) + c3 * (u * v);
     }
     void subset(const Image& image, int x, int y, int w, int h);
 };

@@ -8,7 +8,7 @@ namespace envUtils {
 void initCubemap(Cubemap& cm, const Image& image);
 void createCubemap(Cubemap& cm, int size);
 void equirectangularToCubemap(Cubemap& dest, const Image& equi);
-void writeCubemap_hdr(const char* dir, const Cubemap& cm);
+void writeCubemap_hdr(const char* dir, const char* filename, const Cubemap& cm);
 void freeCubemap(Cubemap& cm);
 void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src);
 
@@ -43,13 +43,15 @@ void prefilterCubemapGGX(CubemapMipMap& cmResult, const CubemapMipMap& cmSourceM
 
 // cubemap mipmap
 void createCubemapMipMap(CubemapMipMap& cmResultMipMap, const Cubemap& cmSource);
-int writeCubemapMipMap_hdr(const char* dir, const CubemapMipMap& cm);
+int writeCubemapMipMap_hdr(const char* dir, const char* basename, const CubemapMipMap& cm);
+int writeCubemapMipMapFaces_hdr(const char* dir, const char* basename, const CubemapMipMap& cm);
 
 // image
 int loadImage(Image& image, const char* filename);
 int writeImage_hdr(const char* filename, const Image& image);
 void createImage(Image& image, int width, int height);
 void freeImage(Image& image);
+void clampImage(Image& src, float maxValue = 255);
 
 // spherical harmonics coefficient
 void computeSphericalHarmonicsFromCubemap(double* spherical, const Cubemap& cm);

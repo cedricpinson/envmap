@@ -1,7 +1,7 @@
 #pragma once
 
-#include <math.h>
 #include <float.h>
+#include <math.h>
 #include <stdlib.h>
 
 // template
@@ -140,7 +140,6 @@ template <typename T> struct Vec2Type
 
 typedef Vec2Type<float> float2;
 typedef Vec2Type<double> double2;
-
 
 template <typename T> struct Vec3Type
 {
@@ -440,7 +439,7 @@ template <typename T> struct Vec4Type
 typedef Vec4Type<float> float4;
 typedef Vec4Type<double> double4;
 
-inline float2 hammersley(uint32_t i, double inverseSampleCount)
+inline double2 hammersley(uint32_t i, double inverseSampleCount)
 {
 
     uint32_t bits = i;
@@ -451,20 +450,23 @@ inline float2 hammersley(uint32_t i, double inverseSampleCount)
     bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
     double y = double(bits) * 2.3283064365386963e-10; // / 0x100000000
 
-    return float2(i * inverseSampleCount, y);
+    return double2(i * inverseSampleCount, y);
 }
 
-inline float D_GGX( float NdotH, float alpha)
+inline double D_GGX(double NoH, double alpha)
 {
-    const float PI_INV = 1.0/M_PI;
     // use GGX / Trowbridge-Reitz, same as Disney and Unreal 4
     // cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
-    float tmp = alpha / (NdotH*NdotH*(alpha*alpha-1.0)+1.0);
-    return tmp * tmp * PI_INV;
+    // const double PI_INV = 1.0 / M_PI;
+    // double tmp = alpha / (NdotH * NdotH * (alpha * alpha - 1.0) + 1.0);
+    // return tmp * tmp * PI_INV;
+    // from filament note
+    // NOTE: (aa-1) == (a-1)(a+1) produces better fp accuracy
+    double f = (alpha - 1) * ((alpha + 1) * (NoH * NoH)) + 1.0;
+    return (alpha * alpha) / (M_PI * f * f);
 }
 
-
-template <typename T>
-inline typename T::value_type dot( const T& a, const T& b ) {
-    return a * b;
-}
+template <typename T> inline typename T::value_type dot(const T& a, const T& b) { return a * b; }
+template <typename T> inline T cross(const T& a, const T& b) { return a ^ b; }
+template <typename T> inline T normalize(const T& a) { return a * (1.0 / a.length()); }
+template <typename T> inline T lerp(const T& a, const T& b, float t) { return a + ((b - a) * t); }

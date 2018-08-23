@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 find_package(TBB)
 
-include_directories( ${TBB_INCLUDE_DIR} "deps/" "src/")
+include_directories( "deps/" "src/")
 
 add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/computeSphericalHarmonicsFromCubemap.cpp
@@ -15,7 +15,7 @@ add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/utils.cpp
   src/Image.cpp src/Cubemap.cpp )
 
-target_link_libraries(envmap ${TBB_LIBRARIES})
+target_link_libraries(envmap pthread)
 
 install(TARGETS envmap
 RUNTIME DESTINATION bin

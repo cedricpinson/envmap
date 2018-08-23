@@ -17,15 +17,17 @@ int main(int argc, char** argv)
         Cubemap cm;
         envUtils::createCubemap(cm, 256);
 
+        envUtils::clampImage(image, 255);
         envUtils::equirectangularToCubemap(cm, image);
-        envUtils::writeCubemap_hdr("test", cm);
+        envUtils::writeCubemap_hdr("test", "input", cm);
 
         CubemapMipMap cmMipMap;
         envUtils::createCubemapMipMap(cmMipMap, cm);
-        envUtils::writeCubemapMipMap_hdr("test", cmMipMap);
+        envUtils::writeCubemapMipMapFaces_hdr("test", "mipmap", cmMipMap);
 
         CubemapMipMap cmPrefilter;
-        envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, 512);
+        envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, 1024);
+        envUtils::writeCubemapMipMapFaces_hdr("test", "prefilter", cmPrefilter);
 
         envUtils::writeImage_hdr("./test.hdr", image);
 

@@ -222,20 +222,36 @@ void freeCubemap(Cubemap& cm)
     }
 }
 
-void writeCubemap_hdr(const char* dir, const Cubemap& cm)
+void writeCubemap_hdr(const char* dir, const char* basename, const Cubemap& cm)
 {
     make_directory(dir);
 
     Path path;
+    char filename[512];
     for (int f = 0; f < 6; f++)
     {
-        create_path(path, dir, envUtils::getCubemapFaceName((Cubemap::Face)f));
+        snprintf(filename, 511, "%s_%s", basename, envUtils::getCubemapFaceName((Cubemap::Face)f));
+        create_path(path, dir, filename);
         const Image& image = cm.faces[f];
         writeImage_hdr(path, image);
     }
 
-    create_path(path, dir, "cross");
+    snprintf(filename, 511, "%s_%s", basename, "cross");
+    create_path(path, dir, filename);
     writeImage_hdr(path, cm.image);
+}
+
+void clampImage(Image& src, float maxValue)
+{
+    const size_t size = src.width * src.height;
+    float3* data = src.data;
+    for (int i = 0; i < size; i++, data++)
+    {
+        float3& pixel = *data;
+        pixel[0] = fmin(pixel[0], maxValue);
+        pixel[1] = fmin(pixel[1], maxValue);
+        pixel[2] = fmin(pixel[2], maxValue);
+    }
 }
 
 // this part is from filament https://github.com/google/filament/blob/master/tools/cmgen/src/CubemapUtils.cpp
@@ -259,10 +275,12 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
                 // x =  cos(phi) sin(theta)
                 // y = -sin(phi)
                 // z = -cos(phi) cos(theta)
-                const double3 s0(dst.getDirectionFor((Cubemap::Face)f, x, y));
+                float3 s0;
+                dst.getDirectionFor(s0, (Cubemap::Face)f, x, y);
                 const double t0 = atan2(s0[0], -s0[2]);
                 const double p0 = asin(s0[1]);
-                const double3 s1(dst.getDirectionFor((Cubemap::Face)f, x + 1, y + 1));
+                float3 s1;
+                dst.getDirectionFor(s1, (Cubemap::Face)f, x + 1, y + 1);
                 const double t1 = atan2(s1[0], -s1[2]);
                 const double p1 = asin(s1[1]);
                 const double dt = abs(t1 - t0);
@@ -272,22 +290,29 @@ void equirectangularToCubemap(Cubemap& dst, const Image& src)
                 const size_t numSamples = (size_t const)ceil(fmax(dx, dy));
                 const float iNumSamples = 1.0f / numSamples;
 
-                float3 c = float3(0, 0, 0);
+                double3 c = double3(0, 0, 0);
                 for (size_t sample = 0; sample < numSamples; sample++)
                 {
                     // Generate numSamples in our destination pixels and map them to input pixels
-                    const float2 h = hammersley(size_t(sample), iNumSamples);
-                    const double3 s(dst.getDirectionFor((Cubemap::Face)f, x + h[0], y + h[1]));
-                    float xf = float(atan2(s[0], -s[2]) * M_1_PI); // range [-1.0, 1.0]
-                    float yf = float(asin(-s[1]) * (2 * M_1_PI));  // range [-1.0, 1.0]
-                    xf = (xf + 1) * 0.5f * (width - 1);            // range [0, width [
-                    yf = (yf + 1) * 0.5f * (height - 1);           // range [0, height[
+                    const double2 h = hammersley(size_t(sample), iNumSamples);
+                    float3 s;
+                    dst.getDirectionFor(s, (Cubemap::Face)f, float(x + h[0]), float(y + h[1]));
+                    double xf = atan2(s[0], -s[2]) * M_1_PI; // range [-1.0, 1.0]
+                    double yf = asin(-s[1]) * (2 * M_1_PI);  // range [-1.0, 1.0]
+                    xf = (xf + 1) * 0.5 * (width - 1);       // range [0, width [
+                    yf = (yf + 1) * 0.5 * (height - 1);      // range [0, height[
                     // we can't use filterAt() here because it reads past the width/height
                     // which is okay for cubmaps but not for square images
-                    c += src.getPixel((uint32_t)xf, (uint32_t)yf);
+                    const float3 pixel = src.getPixel((uint32_t)xf, (uint32_t)yf);
+                    c[0] += pixel[0];
+                    c[1] += pixel[1];
+                    c[2] += pixel[2];
                 }
                 c *= iNumSamples;
-                *data = c;
+                float3& resultPixel = *data;
+                resultPixel[0] = c[0];
+                resultPixel[1] = c[1];
+                resultPixel[2] = c[2];
             }
         }
     }
@@ -306,7 +331,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
             float3* dstLine = &dst.faces[f].getPixel(0, y);
             for (size_t x = 0; x < dim; ++x)
             {
-                dstLine[x] = srcFace.filterAt(x * scale + 0.5, y * scale + 0.5);
+                srcFace.filterAt(dstLine[x], x * scale + 0.5, y * scale + 0.5);
             }
         }
     }
@@ -315,7 +340,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
 void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
 {
     size_t maxSize = cm.size;
-    size_t numMipMap = log2(maxSize);
+    size_t numMipMap = log2(maxSize) + 1;
 
     cmMipMap.init(numMipMap);
 
@@ -326,14 +351,14 @@ void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
 
     for (size_t i = 1; i < numMipMap; i++)
     {
-        size_t size = pow(2, numMipMap - i);
+        size_t size = pow(2, (numMipMap - 1) - i);
         envUtils::createCubemap(cmMipMap.levels[i], size);
         envUtils::downsampleCubemapLevelBoxFilter(cmMipMap.levels[i], cmMipMap.levels[i - 1]);
         cmMipMap.levels[i].makeSeamless();
     }
 }
 
-int writeCubemapMipMap_hdr(const char* dir, const CubemapMipMap& cm)
+int writeCubemapMipMap_hdr(const char* dir, const char* basename, const CubemapMipMap& cm)
 {
     make_directory(dir);
 
@@ -341,10 +366,26 @@ int writeCubemapMipMap_hdr(const char* dir, const CubemapMipMap& cm)
     char filename[256];
     for (int i = 0; i < cm.numLevel; i++)
     {
-        snprintf(filename, 255, "mipmap_level_%d", i);
+        snprintf(filename, 255, "%s_level_%d", basename, i);
         create_path(path, dir, filename);
         const Image& image = cm.levels[i].image;
         writeImage_hdr(path, image);
+    }
+    return 0;
+}
+
+int writeCubemapMipMapFaces_hdr(const char* dir, const char* basename, const CubemapMipMap& cmMipMap)
+{
+    make_directory(dir);
+
+    Path path;
+    char filename[256];
+    for (int i = 0; i < cmMipMap.numLevel; i++)
+    {
+        snprintf(filename, 255, "%s_level_%d", basename, i);
+        create_path(path, dir, filename);
+        const Cubemap& cm = cmMipMap.levels[i];
+        writeCubemap_hdr(path, filename, cm);
     }
     return 0;
 }
