@@ -266,9 +266,10 @@ void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1,
 #endif
 }
 
-void prefilterRangeLines(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap,
+void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const CubemapMipMap& cubemap,
                          float roughnessLinear, const CacheSample& samples, int yStart, int yStop)
 {
+    Cubemap& cubemapDest = *cubemapDestPtr;
     size_t size = cubemapDest.size;
     Image& face = cubemapDest.faces[faceIndex];
 
@@ -359,7 +360,7 @@ void threadLines(func, int nbThread, int nbLines)
 #endif
 
 void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap, float roughnessLinear,
-                   const CacheSample& samples, int nbThread = 4)
+                   const CacheSample& samples, int nbThread = 1)
 {
     int nbLines = cubemapDest.size;
 
@@ -384,8 +385,7 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         if (stopY > nbLines - 1)
             stopY = nbLines - 1;
 
-        threadList[i] =
-            std::thread(prefilterRangeLines, cubemapDest, faceIndex, cubemap, roughnessLinear, samples, startY, stopY);
+        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, cubemap, roughnessLinear, samples, startY, stopY);
 
         startY = stopY + 1;
     }
@@ -395,7 +395,7 @@ void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapM
         threadList[i].join();
     }
 #else
-    prefilterRangeLines(cubemapDest, faceIndex, cubemap, roughnessLinear, samples, 0, nbLines - 1);
+    prefilterRangeLines(&cubemapDest, faceIndex, cubemap, roughnessLinear, samples, 0, nbLines - 1);
 #endif
 }
 
