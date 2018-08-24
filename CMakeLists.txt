@@ -12,6 +12,7 @@ add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/computeSphericalHarmonicsFromCubemap.cpp
   src/prefilterCubemapGGX.cpp
   src/utils.cpp
+  src/log.cpp
   src/Image.cpp src/Cubemap.cpp )
 
 target_link_libraries(envmap pthread)

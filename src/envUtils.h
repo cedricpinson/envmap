@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Cubemap.h"
 #include "CubemapMipMap.h"
 #include "Image.h"
@@ -12,31 +14,6 @@ void writeCubemap_hdr(const char* dir, const char* filename, const Cubemap& cm);
 void freeCubemap(Cubemap& cm);
 void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src);
 
-inline const char* getCubemapFaceName(Cubemap::Face face)
-{
-    switch (face)
-    {
-    case Cubemap::NX:
-        return "face-NX";
-        break;
-    case Cubemap::PX:
-        return "face-PX";
-        break;
-    case Cubemap::NY:
-        return "face-NY";
-        break;
-    case Cubemap::PY:
-        return "face-PY";
-        break;
-    case Cubemap::NZ:
-        return "face-NZ";
-        break;
-    case Cubemap::PZ:
-        return "face-PZ";
-        break;
-    }
-    return "NONE";
-}
 
 // prefilterCubemapGGX
 void prefilterCubemapGGX(CubemapMipMap& cmResult, const CubemapMipMap& cmSourceMipMap, size_t numSamples);

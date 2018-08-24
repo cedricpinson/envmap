@@ -1,6 +1,5 @@
-#include <atomic>
-#include <iostream>
-#include <thread>
+#include "log.h"
+#include "threadLines.h"
 
 #include "Cubemap.h"
 #include "envUtils.h"
@@ -24,12 +23,13 @@ struct CacheSample
     CacheEntry* samples;
     double totalWeight;
     int numSamples;
-    CacheSample(size_t numSamples)
-        : numSamples(numSamples)
+
+    void create(int num)
     {
+        numSamples = num;
         samples = new CacheEntry[numSamples];
     }
-    ~CacheSample() { delete[] samples; }
+    void free() { delete[] samples; }
 };
 
 // from filament I had the same but it's cleaner in filament
@@ -266,12 +266,26 @@ void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1,
 #endif
 }
 
-void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const CubemapMipMap* cubemapPtr,
-                         const CacheSample* samplesPtr, int yStart, int yStop)
+struct PrefilterContext
 {
-    const CacheSample& samples = *samplesPtr;
-    Cubemap& cubemapDest = *cubemapDestPtr;
-    const CubemapMipMap& cubemap = *cubemapPtr;
+    Cubemap* cubemapDest;
+    Cubemap::Face face;
+    const CubemapMipMap* cubemap;
+    const CacheSample* samples;
+    PrefilterContext(Cubemap* cm, Cubemap::Face face, const CubemapMipMap* cmMipMap, const CacheSample* sample)
+        : cubemapDest(cm)
+        , face(face)
+        , cubemap(cmMipMap)
+        , samples(sample)
+    {}
+};
+
+void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
+{
+    const CacheSample& samples = *context.samples;
+    Cubemap& cubemapDest = *context.cubemapDest;
+    const CubemapMipMap& cubemap = *context.cubemap;
+    Cubemap::Face faceIndex = context.face;
 
     int size = cubemapDest.size;
     Image& face = cubemapDest.faces[faceIndex];
@@ -340,49 +354,10 @@ void prefilterRangeLines(Cubemap* cubemapDestPtr, Cubemap::Face faceIndex, const
         }
     }
 }
-#define USE_THREAD
-
-void prefilterFace(Cubemap& cubemapDest, Cubemap::Face faceIndex, const CubemapMipMap& cubemap, const CacheSample& samples, int nbThread)
-{
-    int nbLines = cubemapDest.size;
-#ifdef USE_THREAD
-    std::thread threadList[64];
-
-    if (nbThread > 64)
-        nbThread = 64;
-
-    if (nbLines < nbThread)
-    {
-        nbThread = nbLines;
-    }
-
-    float linesPerThread = nbLines / nbThread;
-    int startY = 0;
-    int stopY;
-    for (int i = 0; i < nbThread; i++)
-    {
-        stopY = startY + ceil(linesPerThread);
-        if (stopY > nbLines - 1)
-            stopY = nbLines - 1;
-
-        threadList[i] = std::thread(prefilterRangeLines, &cubemapDest, faceIndex, &cubemap, &samples,
-                                    startY, stopY);
-
-        startY = stopY + 1;
-    }
-
-    for (int i = 0; i < nbThread; i++)
-    {
-        threadList[i].join();
-    }
-#else
-    prefilterRangeLines(&cubemapDest, faceIndex, &cubemap, &samples, 0, nbLines - 1);
-#endif
-}
-
 void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_t numSamples)
 {
     int nbThread;
+
 #ifdef USE_THREAD
     nbThread = std::thread::hardware_concurrency();
     printf("using %d threads\n", nbThread);
@@ -402,16 +377,23 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
 
     float stepRoughness = 1.0 / float(maxMipMap);
 
+    char logString[24];
+    snprintf(logString, 24, "prefiltering level %d", 0);
+    auto t = logStart(logString);
+
     // copy for roughness = 0;
     memcpy(cmDst.levels[0].image.data, cmSrc.levels[0].image.data,
            cmSrc.levels[0].image.width * cmSrc.levels[0].image.height * sizeof(float3));
 
-    CacheSample cacheSamples(numSamples);
+    logEnd(t);
 
-    for (int mipLevel = 1; mipLevel < 2 // numMipMap
-         ;
-         mipLevel++)
+    CacheSample cacheSamples;
+    cacheSamples.create(numSamples);
+
+    for (int mipLevel = 1; mipLevel < numMipMap; mipLevel++)
     {
+        snprintf(logString, 24, "prefiltering level %d", mipLevel);
+        t = logStart(logString);
         float roughness = mipLevel * stepRoughness;
         float roughnessLinear = roughness * roughness;
 
@@ -423,12 +405,17 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
 
         writeWeightDistribution(cacheSamples, roughnessLinear, numSamples, mipLevel);
 
+        int nbLines = cmDst.levels[mipLevel].size;
         // iterate on each face to compute ggx
         for (int face = 0; face < 6; face++)
         {
-            prefilterFace(cmDst.levels[mipLevel], (Cubemap::Face)face, cmSrc, cacheSamples, nbThread);
+            PrefilterContext context(&cmDst.levels[mipLevel], (Cubemap::Face)face, &cmSrc, &cacheSamples);
+            threadLines(prefilterRangeLines, context, nbLines, nbThread);
         }
+        logEnd(t);
     }
-} // namespace envUtils
+
+    cacheSamples.free();
+}
 
 } // namespace envUtils
