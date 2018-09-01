@@ -10,13 +10,14 @@ struct Cubemap
     Image image;
     int size;
 
+    // order in opengl
     enum Face {
-        NX = 0, // left            +----+
-        PX,     // right           | PY |
-        NY,     // bottom     +----+----+----+----+
-        PY,     // top        | NX | PZ | PX | NZ |
-        NZ,     // back       +----+----+----+----+
-        PZ      // front           | NY |
+        PX = 0, // right           +----+
+        NX,     // left            | PY |
+        PY,     // top        +----+----+----+----+
+        NY,     // bottom     | NX | PZ | PX | NZ |
+        PZ,     // front      +----+----+----+----+
+        NZ      // back            | NY |
                 //                 +----+
     };
 

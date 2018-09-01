@@ -8,6 +8,16 @@
 #include <stdio.h>
 #include <string.h>
 
+// define this to profile main functions that prefilter
+// also needs to link with profile lib from gperftools
+// then run pprof -top ./envmap ./prefilterCubemapGGX.txt
+#define PROFILER
+
+
+#ifdef PROFILER
+#include <gperftools/profiler.h>
+#endif
+
 //#define DEBUG_SAMPLE
 
 namespace envUtils {
@@ -182,7 +192,7 @@ void computeBasisVector(float3& tangentX, float3& tangentY, const float3& N)
 
 void getAddressFor(Cubemap::Address& addr, const float3& r)
 {
-    double sc, tc, ma;
+    float sc, tc, ma;
     const float rx = fabs(r[0]);
     const float ry = fabs(r[1]);
     const float rz = fabs(r[2]);
@@ -235,12 +245,12 @@ void getAddressFor(Cubemap::Address& addr, const float3& r)
         }
     }
     // ma is guaranteed to be >= sc and tc
-    addr.s = (sc / ma + 1) * 0.5f;
-    addr.t = (tc / ma + 1) * 0.5f;
+    addr.s = (sc / ma + 1.f) * 0.5f;
+    addr.t = (tc / ma + 1.f) * 0.5f;
 }
 
-void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1, const float3& direction,
-                  float lerpFactor)
+inline void getTrilinear(float3& color, const Cubemap& cubemap0, const Cubemap& cubemap1, const float3& direction,
+                         float lerpFactor)
 {
     Cubemap::Address address;
     getAddressFor(address, direction);
@@ -249,21 +259,17 @@ void getTrilinear(float3& color, const Cubemap cubemap0, const Cubemap cubemap1,
     const Image& lod0 = cubemap0.faces[address.face];
     const Image& lod1 = cubemap1.faces[address.face];
 
-    float x0, y0;
-    float x1, y1;
-    x0 = address.s * lod0.width;
-    y0 = address.t * lod0.width;
-    x1 = address.s * lod1.width;
-    y1 = address.t * lod1.width;
+    float x0 = address.s * lod0.width;
+    float y0 = address.t * lod0.width;
+    float x1 = address.s * lod1.width;
+    float y1 = address.t * lod1.width;
 
-    lod0.filterAt(color0, address.s * lod0.width, address.t * lod0.width);
-    lod1.filterAt(color1, address.s * lod1.width, address.t * lod1.width);
+    lod0.filterAt(color0, x0, y0);
+    lod1.filterAt(color1, x1, y1);
 
-    color = lerp(color0, color1, lerpFactor);
-#ifdef DEBUG_SAMPLE
-    printf("face %d l0 %f %f - l1 %f %f - color %f %f %f \n", address.face, x0, y0, x1, y1, color[0], color[1],
-           color[2]);
-#endif
+    color[0] = color0[0] + (color1[0] - color0[0]) * lerpFactor;
+    color[1] = color0[1] + (color1[1] - color0[1]) * lerpFactor;
+    color[2] = color0[2] + (color1[2] - color0[2]) * lerpFactor;
 }
 
 struct PrefilterContext
@@ -280,8 +286,37 @@ struct PrefilterContext
     {}
 };
 
+// inline void rotateDirection(float3& L, float angle, const float3& l)
+// {
+//     float s, c, t;
+
+//     s = sinf(angle);
+//     c = cosf(angle);
+//     t = 1.f - c;
+
+//     L[0] = l[0] * c + l[1] * s;
+//     L[1] = -l[0] * s + l[1] * c;
+//     L[2] = l[2] * (t + c);
+// }
+
+inline void transformSampleLocal2World(float3& world, const float3& tangentX, const float3& tangentY,
+                                       const float3& direction, const float3& local)
+{
+    // lWorldSpace = tangentX * Lr[0] + tangentY * Lr[1] + direction * Lr[2]);
+    world[0] = tangentX[0] * local[0] + tangentY[0] * local[1] + direction[0] * local[2];
+    world[1] = tangentX[1] * local[0] + tangentY[1] * local[1] + direction[1] * local[2];
+    world[2] = tangentX[2] * local[0] + tangentY[2] * local[1] + direction[2] * local[2];
+}
+
 void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
 {
+
+    //Showing nodes accounting for 27.52s, 99.89% of 27.55s total
+    //Dropped 1 node (cum <= 0.14s)
+    //      flat  flat%   sum%        cum   cum%
+    //       20s 72.60% 72.60%        20s 72.60%  envUtils::getTrilinear
+    //     7.52s 27.30% 99.89%     27.44s 99.60%  envUtils::prefilterRangeLines
+
     const CacheSample& samples = *context.samples;
     Cubemap& cubemapDest = *context.cubemapDest;
     const CubemapMipMap& cubemap = *context.cubemap;
@@ -294,7 +329,8 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
     float3 tangentY;
     float3 direction;
     float3 color;
-    float3 LworldSpace;
+    float3 lWorldSpace, Lr;
+    double3 prefilteredColor;
 
     for (int y = yStart; y <= yStop; ++y)
     {
@@ -302,65 +338,46 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
         float3* line = &face.getPixel(0, y);
         for (int x = 0; x < size; x++)
         {
-
+            prefilteredColor = {0, 0, 0};
             cubemapDest.getDirectionFor(direction, faceIndex, x, y);
-
-            double3 prefilteredColor = {0, 0, 0};
 
             computeBasisVector(tangentX, tangentY, direction);
 
-            // see getPrecomputedLightInLocalSpace in Math
-            // and
             // https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
             // for the simplification
 
             // optimized lod version
-#ifdef DEBUG_SAMPLE
-            printf("%f w %f face %d direction %f %f %f , %d %d\n", roughnessLinear, samples.totalWeight, faceIndex,
-                   direction[0], direction[1], direction[2], x, y);
-#endif
             for (int i = 0; i < samples.numSamples; i++)
             {
                 const CacheEntry& sample = samples.samples[i];
                 const float3& L = sample.direction;
 
                 float NoL = L[2];
-                float3 LworldSpace(tangentX * L[0] + tangentY * L[1] + direction * L[2]);
+
+                transformSampleLocal2World(lWorldSpace, tangentX, tangentY, direction, L);
 
                 const Cubemap& lod0 = cubemap.levels[sample.l0];
                 const Cubemap& lod1 = cubemap.levels[sample.l1];
 
-#ifdef DEBUG_SAMPLE
-                printf("sample %d, %f %f %f (%d-%d) - ", i, LworldSpace[0], LworldSpace[1], LworldSpace[2], sample.l0,
-                       sample.l1);
-#endif
-                getTrilinear(color, lod0, lod1, LworldSpace, sample.lerp);
+                getTrilinear(color, lod0, lod1, lWorldSpace, sample.lerp);
 
-                color *= NoL;
-
-                prefilteredColor[0] += color[0];
-                prefilteredColor[1] += color[1];
-                prefilteredColor[2] += color[2];
+                prefilteredColor[0] += color[0] * NoL;
+                prefilteredColor[1] += color[1] * NoL;
+                prefilteredColor[2] += color[2] * NoL;
             }
 
-            prefilteredColor *= 1 / samples.totalWeight;
-#ifdef DEBUG_SAMPLE
-            printf("finale color %f %f %f\n", prefilteredColor[0], prefilteredColor[1], prefilteredColor[2]);
-#endif
+            double invWeight = 1 / samples.totalWeight;
 
-            line[x][0] = (float)prefilteredColor[0];
-            line[x][1] = (float)prefilteredColor[1];
-            line[x][2] = (float)prefilteredColor[2];
+            line[x][0] = (float)(prefilteredColor[0] * invWeight);
+            line[x][1] = (float)(prefilteredColor[1] * invWeight);
+            line[x][2] = (float)(prefilteredColor[2] * invWeight);
         }
     }
 }
-void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_t numSamples)
+void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_t numSamples, int nbThread)
 {
-    int nbThread;
-
-#ifdef USE_THREAD
-    nbThread = std::thread::hardware_concurrency();
-    printf("using %d threads\n", nbThread);
+#ifdef PROFILER
+    ProfilerStart("./prefilterCubemapGGX.txt");
 #endif
 
     // build mipmap from cmSrc
@@ -403,8 +420,9 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
         // precompute samples
         precomputeSamples(cacheSamples, roughnessLinear, numSamples, size);
 
+#ifdef DEBUG_SAMPLE
         writeWeightDistribution(cacheSamples, roughnessLinear, numSamples, mipLevel);
-
+#endif
         int nbLines = cmDst.levels[mipLevel].size;
         // iterate on each face to compute ggx
         for (int face = 0; face < 6; face++)
@@ -416,6 +434,10 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
     }
 
     cacheSamples.free();
+
+#ifdef PROFILER
+    ProfilerStop();
+#endif
 }
 
 } // namespace envUtils

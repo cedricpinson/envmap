@@ -13,10 +13,11 @@ add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/prefilterCubemapGGX.cpp
   src/utils.cpp
   src/log.cpp
+  src/encode.cpp
   src/Image.cpp src/Cubemap.cpp )
 
-target_link_libraries(envmap pthread)
-target_compile_options(envmap PRIVATE -Wall -Wextra -pedantic -Werror)
+target_link_libraries(envmap pthread profiler )
+target_compile_options(envmap PRIVATE -Wall -Wextra -pedantic -Werror -g -c)
 
 install(TARGETS envmap
 RUNTIME DESTINATION bin

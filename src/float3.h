@@ -191,6 +191,8 @@ template <typename T> struct Vec3Type
         _v[2] = rhs._v[2];
     }
 
+    inline Vec3Type max(value_type m) { return Vec3Type(fmax(_v[0], m), fmax(_v[1], m), fmax(_v[2], m)); }
+
     inline value_type& operator[](int i) { return _v[i]; }
     inline value_type operator[](int i) const { return _v[i]; }
 
@@ -470,3 +472,8 @@ template <typename T> inline typename T::value_type dot(const T& a, const T& b) 
 template <typename T> inline T cross(const T& a, const T& b) { return a ^ b; }
 template <typename T> inline T normalize(const T& a) { return a * (1.0 / a.length()); }
 template <typename T> inline T lerp(const T& a, const T& b, float t) { return a + ((b - a) * t); }
+template <typename T> inline T frac(T v) { return v - floor(v); }
+template <typename T> inline T clamp(T v, T minimum, T maximum)
+{
+    return v < minimum ? minimum : v > maximum ? maximum : v;
+}

@@ -1,6 +1,7 @@
 #include "envUtils.h"
 #include "Cubemap.h"
 #include "Spherical.h"
+#include "encode.h"
 #include "float3.h"
 #include "log.h"
 #include "threadLines.h"
@@ -25,8 +26,10 @@
 
 namespace envUtils {
 
-int writeSpherical_json(const char* outputFilename, double* spherical)
+int writeSpherical_json(const char* dir, const char* basename, double* spherical)
 {
+    Path outputFilename;
+    snprintf(outputFilename, 255, "%s/%s.json", dir, basename);
     printf("writing file %s\n", outputFilename);
 
     const size_t BufferSize = 4096;
@@ -167,6 +170,87 @@ int writeImage_hdr(const char* filename, const Image& image)
     return ret;
 }
 
+int writeImage_ldr(const char* filename, const Image& image)
+{
+    printf("writing %s file\n", filename);
+    uint8_t* dest = new uint8_t[image.width * image.height * 3];
+
+    for (int y = 0; y < image.height; y++)
+    {
+        for (int x = 0; x < image.width; x++)
+        {
+            uint8_t* pixelDst = &dest[(x + y * image.width) * 3];
+            const float3& pixelSrc = image.getPixel(x, y);
+            // operation hdr to ldr
+            tonemap(pixelDst, pixelSrc.ptr());
+        }
+    }
+    int ret = stbi_write_jpg(filename, image.width, image.height, 3, dest, 92);
+
+    delete[] dest;
+    return ret;
+}
+
+int writeThumbnail(const char* dir, const char* basename, const Image& image, int width, int height)
+{
+    auto t = logStart("createThumbnail");
+
+    Image thumbnail;
+    Image thumbnailTmp;
+    envUtils::createImage(thumbnail, width, height);
+    envUtils::createImage(thumbnailTmp, width, image.height);
+
+    int scaleX = image.width / width;
+    float invScaleX = 1.0 / scaleX;
+    for (int y = 0; y < image.height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            float3& pixel = thumbnailTmp.getPixel(x, y);
+            const float* src = image.getPixel(x * scaleX, y).ptr();
+            for (int s = 0; s < scaleX; s++)
+            {
+                pixel[0] += src[s * 3 + 0];
+                pixel[1] += src[s * 3 + 1];
+                pixel[2] += src[s * 3 + 2];
+            }
+            pixel[0] *= invScaleX;
+            pixel[1] *= invScaleX;
+            pixel[2] *= invScaleX;
+        }
+    }
+
+    int scaleY = image.height / height;
+    float invScaleY = 1.0 / scaleY;
+    for (int x = 0; x < width; x++)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            float3& pixel = thumbnail.getPixel(x, y);
+            float* src = thumbnailTmp.getPixel(x, y * scaleY).ptr();
+            for (int s = 0; s < scaleY; s++)
+            {
+                pixel[0] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 0];
+                pixel[1] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 1];
+                pixel[2] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 2];
+            }
+            pixel[0] *= invScaleY;
+            pixel[1] *= invScaleY;
+            pixel[2] *= invScaleY;
+        }
+    }
+
+    logEnd(t);
+
+    Path file;
+    snprintf(file, 1023, "%s/%s.jpg", dir, basename);
+    envUtils::writeImage_ldr(file, thumbnail);
+
+    envUtils::freeImage(thumbnail);
+    envUtils::freeImage(thumbnailTmp);
+    return 0;
+}
+
 int loadImage(Image& image, const char* filename)
 {
     const char* ext = get_filename_ext(filename);
@@ -263,6 +347,146 @@ void writeCubemap_hdr(const char* dir, const char* basename, const Cubemap& cm)
     writeImage_hdr(path, cm.image);
 }
 
+#define ENTERLEAVE
+int readCubemapMipMap_luv(CubemapMipMap& cmMipMap, const char* path)
+{
+    int baseSize = 256;
+    int numLod = log2(baseSize) + 1;
+
+    cmMipMap.init(numLod);
+
+    FILE* fp = fopen(path, "rb");
+    if (!fp)
+    {
+        printf("can't open file %s", path);
+        return 1;
+    }
+
+    uint8_t* src = new uint8_t[baseSize * baseSize * 4];
+    for (int mipLevel = 0; mipLevel < numLod; mipLevel++)
+    {
+        int size = pow(2, (numLod - mipLevel - 1));
+        Cubemap cm;
+        createCubemap(cm, size);
+
+        cmMipMap.levels[mipLevel] = cm;
+        for (int f = 0; f < 6; f++)
+        {
+            fread(src, size * size * 4, 1, fp);
+            for (int y = 0; y < size; y++)
+            {
+                float3* lineDst = &cm.faces[f].getPixel(0, y);
+                for (int x = 0; x < size; x++)
+                {
+#ifdef ENTERLEAVE
+                    uint8_t rgba8[4];
+                    // interleave the face
+                    rgba8[0] = src[y * size + x + (size * size * 0)];
+                    rgba8[1] = src[y * size + x + (size * size * 1)];
+                    rgba8[2] = src[y * size + x + (size * size * 2)];
+                    rgba8[3] = src[y * size + x + (size * size * 3)];
+                    decodeLUV(lineDst[x].ptr(), rgba8);
+#else
+                    decodeLUV(lineDst[x].ptr(), &src[(y * size + x) * 4]);
+#endif
+                }
+            }
+        }
+    }
+    fclose(fp);
+    delete[] src;
+    return 0;
+}
+
+static void writeCubemap_luv_internal(FILE* fp, uint8_t* tempBuffer, const Cubemap& cm)
+{
+    uint8_t* dest = tempBuffer;
+    int size = cm.size;
+    for (int i = 0; i < 6; i++)
+    {
+        for (int y = 0; y < size; y++)
+        {
+            const float3* lineSrc = &cm.faces[i].getPixel(0, y);
+            for (int x = 0; x < size; x++)
+            {
+#ifdef ENTERLEAVE
+                uint8_t rgba8[4];
+                // interleave the face
+                encodeLUV(rgba8, lineSrc[x].ptr());
+                dest[y * size + x + (size * size * 0)] = rgba8[0];
+                dest[y * size + x + (size * size * 1)] = rgba8[1];
+                dest[y * size + x + (size * size * 2)] = rgba8[2];
+                dest[y * size + x + (size * size * 3)] = rgba8[3];
+#else
+                encodeLUV(&Dst[(y * size + x) * 4], lineSrc[x].ptr());
+#endif
+            }
+        }
+        fwrite(dest, size * size * 4, 1, fp);
+    }
+}
+
+int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm)
+{
+    make_directory(dir);
+
+    Path path;
+    char filename[511];
+    snprintf(filename, 511, "%s.luv", basename);
+    create_path(path, dir, filename);
+
+    printf("writing %s file\n", path);
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    // allocate only one face
+    int maxSize = cm.size;
+    uint8_t* dest = new uint8_t[maxSize * maxSize * 4];
+
+    writeCubemap_luv_internal(fp, dest, cm);
+
+    fclose(fp);
+    delete[] dest;
+    return 0;
+}
+
+int writeCubemapMipMap_luv(const char* dir, const char* basename, const CubemapMipMap& cmMipMap)
+{
+    make_directory(dir);
+
+    Path path;
+    char filename[511];
+    snprintf(filename, 511, "%s.luv", basename);
+    create_path(path, dir, filename);
+
+    printf("writing %s file\n", path);
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    // allocate only one face
+    int maxSize = cmMipMap.levels[0].size;
+    uint8_t* dest = new uint8_t[maxSize * maxSize * 4];
+
+    for (int mipLevel = 0; mipLevel < cmMipMap.numLevel; mipLevel++)
+    {
+        const Cubemap& cm = cmMipMap.levels[mipLevel];
+        writeCubemap_luv_internal(fp, dest, cm);
+    }
+    fclose(fp);
+    delete[] dest;
+    return 0;
+}
+
 void clampImage(Image& src, float maxValue)
 {
     const int size = src.width * src.height;
@@ -352,13 +576,9 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
     }
 }
 
-void equirectangularToCubemap(Cubemap& dst, const Image& src)
+void equirectangularToCubemap(Cubemap& dst, const Image& src, int nbThread)
 {
-    int nbThread;
-    nbThread = std::thread::hardware_concurrency();
-    printf("using %d threads\n", nbThread);
     auto t = logStart("equirectangularToCubemap");
-
     for (int f = 0; f < 6; f++)
     {
         EquirectangularProcessContext context(&dst, (Cubemap::Face)f, &src);

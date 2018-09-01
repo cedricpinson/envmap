@@ -4,6 +4,9 @@
 #include "envUtils.h"
 #include <getopt.h>
 #include <stdio.h>
+#include <thread>
+
+bool debug = false;
 
 int main(int argc, char** argv)
 {
@@ -16,34 +19,55 @@ int main(int argc, char** argv)
     }
 
     Image image;
+    const char* distDir = "test";
 
-    if (envUtils::loadImage(image, file) == 0)
+    int loadImageResult = envUtils::loadImage(image, file);
+    if (loadImageResult == 0)
     {
 
+        int nbThread;
+        nbThread = std::thread::hardware_concurrency();
+        printf("using %d threads\n", nbThread);
+
+
+        // needs to be sure that the panorama is pow of 2
         Cubemap cm;
         envUtils::createCubemap(cm, 256);
 
         envUtils::clampImage(image, 255);
-        envUtils::equirectangularToCubemap(cm, image);
-        envUtils::writeCubemap_hdr("test", "input", cm);
+
+        envUtils::writeThumbnail(distDir, "thumbnail", image, 256, 128);
+        envUtils::equirectangularToCubemap(cm, image, nbThread);
+
+        if (debug)
+            envUtils::writeCubemap_hdr(distDir, "input", cm);
 
         CubemapMipMap cmMipMap;
         envUtils::createCubemapMipMap(cmMipMap, cm);
-        envUtils::writeCubemapMipMapFaces_hdr("test", "mipmap", cmMipMap);
+
+        if (debug)
+            envUtils::writeCubemapMipMapFaces_hdr(distDir, "mipmap", cmMipMap);
 
         CubemapMipMap cmPrefilter;
-        envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, 1024);
-        envUtils::writeCubemapMipMapFaces_hdr("test", "prefilter", cmPrefilter);
+        envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, 4096, nbThread);
 
-        envUtils::writeImage_hdr("./test.hdr", image);
+        if (debug)
+            envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter", cmPrefilter);
 
         Spherical spherical;
         envUtils::computeSphericalHarmonicsFromCubemap(spherical, cm);
-        envUtils::writeSpherical_json("./test/spherical.json", spherical);
+        envUtils::writeSpherical_json(distDir, "spherical", spherical);
+        envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilter);
+
+        // CubemapMipMap cmDecode;
+        // envUtils::readCubemapMipMap_luv(cmDecode, "test/prefilter.luv");
+        // envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter-decode", cmDecode);
+
+        envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
 
         envUtils::freeImage(image);
         envUtils::freeCubemap(cm);
     }
 
-    return 0;
+    return loadImageResult;
 }

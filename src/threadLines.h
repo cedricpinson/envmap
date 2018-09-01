@@ -1,9 +1,9 @@
 #pragma once
 
-#include <thread>
 #include <math.h>
+#include <thread>
 
-#define USE_THREAD
+//#define USE_THREAD
 
 template <class T, class ArgObject> void threadLines(T* func, ArgObject context, int nbLines, int nbThread)
 {
@@ -38,7 +38,8 @@ template <class T, class ArgObject> void threadLines(T* func, ArgObject context,
         threadList[i].join();
     }
 #else
-    printf("thread disabled %d", nbThread);
+    for (int i = 0; i < nbThread; i++)
+        break;
     (*func)(context, 0, nbLines - 1);
 #endif
 }
