@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <thread>
 
-bool debug = false;
+static bool debug = true;
 
 int main(int argc, char** argv)
 {
@@ -26,9 +26,8 @@ int main(int argc, char** argv)
     {
 
         int nbThread;
-        nbThread = std::thread::hardware_concurrency();
+        nbThread = (int)std::thread::hardware_concurrency();
         printf("using %d threads\n", nbThread);
-
 
         // needs to be sure that the panorama is pow of 2
         Cubemap cm;
@@ -59,12 +58,19 @@ int main(int argc, char** argv)
         envUtils::writeSpherical_json(distDir, "spherical", spherical);
         envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilter);
 
-        // CubemapMipMap cmDecode;
-        // envUtils::readCubemapMipMap_luv(cmDecode, "test/prefilter.luv");
-        // envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter-decode", cmDecode);
+        if (debug)
+        {
+            CubemapMipMap cmDecode;
+            envUtils::readCubemapMipMap_luv(cmDecode, "test/prefilter.luv");
+            envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter-decode", cmDecode);
+            envUtils::freeCubemapMipMap(cmDecode);
+        }
 
         envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
 
+
+        envUtils::freeCubemapMipMap(cmPrefilter);
+        envUtils::freeCubemapMipMap(cmMipMap);
         envUtils::freeImage(image);
         envUtils::freeCubemap(cm);
     }

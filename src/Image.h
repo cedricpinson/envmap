@@ -17,8 +17,8 @@ struct Image
     const float3& getPixel(int x, int y) const { return data[x + y * rowInFloat3]; }
     inline void filterAt(float3& pixel, float x, float y) const
     {
-        const float x0 = floorf(x);
-        const float y0 = floorf(y);
+        const float x0 = (int)x; // floor the int
+        const float y0 = (int)y;
         // we allow ourselves to read past the width/height of the Image because the data is valid
         // and contain the "seamless" data.
         const float u = x - x0;

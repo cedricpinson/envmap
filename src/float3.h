@@ -177,6 +177,11 @@ template <typename T> struct Vec3Type
     inline value_type* ptr() { return _v; }
     inline const value_type* ptr() const { return _v; }
 
+    Vec3Type<double> toDouble() const
+    {
+        return Vec3Type<double>((double)_v[0], (double)_v[1], (double)_v[2]);
+    }
+
     inline void set(value_type x, value_type y, value_type z)
     {
         _v[0] = x;
@@ -470,7 +475,7 @@ inline double D_GGX(double NoH, double alpha)
 
 template <typename T> inline typename T::value_type dot(const T& a, const T& b) { return a * b; }
 template <typename T> inline T cross(const T& a, const T& b) { return a ^ b; }
-template <typename T> inline T normalize(const T& a) { return a * (1.0 / a.length()); }
+template <typename T> inline T normalize(const T& a) { return a * (1.0f / a.length()); }
 template <typename T> inline T lerp(const T& a, const T& b, float t) { return a + ((b - a) * t); }
 template <typename T> inline T frac(T v) { return v - floor(v); }
 template <typename T> inline T clamp(T v, T minimum, T maximum)

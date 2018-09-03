@@ -31,7 +31,7 @@ float4 LogLuvEncode(const float* vRGB)
     vResult[0] = Xp_Y_XYZp[0] / Xp_Y_XYZp[2];
     vResult[1] = Xp_Y_XYZp[1] / Xp_Y_XYZp[2];
 
-    float Le = 2.0 * log2(Xp_Y_XYZp[1]) + 127.0;
+    float Le = 2.0f * log2(Xp_Y_XYZp[1]) + 127.0f;
     vResult[3] = frac(Le);
     vResult[2] = (Le - (floor(vResult[3] * 255.0f)) / 255.0f) / 255.0f;
 
@@ -41,10 +41,10 @@ float4 LogLuvEncode(const float* vRGB)
 void encodeLUV(uint8_t* luvDst, const float* rgbSrc)
 {
     float4 result = LogLuvEncode(rgbSrc);
-    luvDst[0] = uint8_t(result[0] * 255.0);
-    luvDst[1] = uint8_t(result[1] * 255.0);
-    luvDst[2] = uint8_t(result[2] * 255.0);
-    luvDst[3] = uint8_t(result[3] * 255.0);
+    luvDst[0] = uint8_t(result[0] * 255);
+    luvDst[1] = uint8_t(result[1] * 255);
+    luvDst[2] = uint8_t(result[2] * 255);
+    luvDst[3] = uint8_t(result[3] * 255);
 }
 
 float uncharted2Tonemap(float x)
@@ -70,7 +70,7 @@ void tonemap(uint8_t* rgbDst, const float* rgbSrc)
     rgb[1] = uncharted2Tonemap(rgbSrc[1] * exposureBias);
     rgb[2] = uncharted2Tonemap(rgbSrc[2] * exposureBias);
 
-    float whiteScale = 1.0 / uncharted2Tonemap(W);
+    float whiteScale = 1.0f / uncharted2Tonemap(W);
 
     rgb[0] *= whiteScale;
     rgb[1] *= whiteScale;
@@ -84,9 +84,9 @@ void tonemap(uint8_t* rgbDst, const float* rgbSrc)
 
 float3 LogLuvDecode(const float* vLogLuv)
 {
-    float Le = vLogLuv[2] * 255.0 + vLogLuv[3];
+    float Le = vLogLuv[2] * 255 + vLogLuv[3];
     float3 Xp_Y_XYZp;
-    Xp_Y_XYZp[1] = exp2((Le - 127.0) / 2.0);
+    Xp_Y_XYZp[1] = exp2((Le - 127) / 2.0f);
     Xp_Y_XYZp[2] = Xp_Y_XYZp[1] / vLogLuv[1];
     Xp_Y_XYZp[0] = vLogLuv[0] * Xp_Y_XYZp[2];
     float3 vRGB;
@@ -111,7 +111,7 @@ void decodeLUV(float* rgb, const uint8_t* luv)
     rgb[2] = result[2];
 }
 
-float RGBMMaxRange = 8.0;
+static float RGBMMaxRange = 8.0;
 
 // https://gist.github.com/aras-p/1199797
 void encodeRGBM(float rgb[3], uint8_t rgbm[4])
@@ -133,12 +133,12 @@ void encodeRGBM(float rgb[3], uint8_t rgbm[4])
     rgbm[0] = uint8_t(fmin(r / a, 1.0f) * 255);
     rgbm[1] = uint8_t(fmin(g / a, 1.0f) * 255);
     rgbm[2] = uint8_t(fmin(b / a, 1.0f) * 255);
-    rgbm[3] = uint8_t(fmin(a, 1.0f) * 255.0);
+    rgbm[3] = uint8_t(fmin(a, 1.0f) * 255);
 }
 
 void decodeRGBM(uint8_t rgbm[4], float rgb[3])
 {
-    rgb[0] = rgbm[0] / 255.0 * RGBMMaxRange * rgbm[3] / 255.0;
-    rgb[1] = rgbm[1] / 255.0 * RGBMMaxRange * rgbm[3] / 255.0;
-    rgb[2] = rgbm[2] / 255.0 * RGBMMaxRange * rgbm[3] / 255.0;
+    rgb[0] = rgbm[0] / 255.0f * RGBMMaxRange * rgbm[3] / 255.0f;
+    rgb[1] = rgbm[1] / 255.0f * RGBMMaxRange * rgbm[3] / 255.0f;
+    rgb[2] = rgbm[2] / 255.0f * RGBMMaxRange * rgbm[3] / 255.0f;
 }

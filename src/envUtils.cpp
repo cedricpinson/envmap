@@ -351,7 +351,7 @@ void writeCubemap_hdr(const char* dir, const char* basename, const Cubemap& cm)
 int readCubemapMipMap_luv(CubemapMipMap& cmMipMap, const char* path)
 {
     int baseSize = 256;
-    int numLod = log2(baseSize) + 1;
+    int numLod = (int)log2(baseSize) + 1;
 
     cmMipMap.init(numLod);
 
@@ -365,7 +365,7 @@ int readCubemapMipMap_luv(CubemapMipMap& cmMipMap, const char* path)
     uint8_t* src = new uint8_t[baseSize * baseSize * 4];
     for (int mipLevel = 0; mipLevel < numLod; mipLevel++)
     {
-        int size = pow(2, (numLod - mipLevel - 1));
+        int size = (int)pow(2, (numLod - mipLevel - 1));
         Cubemap cm;
         createCubemap(cm, size);
 
@@ -503,12 +503,13 @@ void clampImage(Image& src, float maxValue)
 struct EquirectangularProcessContext
 {
     Cubemap* dst;
-    Cubemap::Face face;
     const Image* src;
+    Cubemap::Face face;
+    int padding;
     EquirectangularProcessContext(Cubemap* dst, Cubemap::Face face, const Image* src)
         : dst(dst)
-        , face(face)
         , src(src)
+        , face(face)
     {}
 };
 
@@ -534,12 +535,16 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
             // x =  cos(phi) sin(theta)
             // y = -sin(phi)
             // z = -cos(phi) cos(theta)
-            float3 s0;
-            dst.getDirectionFor(s0, faceIdex, x, y);
+            float3 s0f;
+            dst.getDirectionFor(s0f, faceIdex, x, y);
+            double3 s0 = s0f.toDouble();
+
             const double t0 = atan2(s0[0], -s0[2]);
             const double p0 = asin(s0[1]);
-            float3 s1;
-            dst.getDirectionFor(s1, faceIdex, x + 1, y + 1);
+            float3 s1f;
+            dst.getDirectionFor(s1f, faceIdex, x + 1, y + 1);
+            double3 s1 = s1f.toDouble();
+
             const double t1 = atan2(s1[0], -s1[2]);
             const double p1 = asin(s1[1]);
             const double dt = abs(t1 - t0);
@@ -547,25 +552,26 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
             const double dx = abs(r * dt);
             const double dy = abs(r * dp * s0[1]);
             const size_t numSamples = (size_t const)ceil(fmax(dx, dy));
-            const float iNumSamples = 1.0f / numSamples;
+            const double iNumSamples = 1.0 / numSamples;
 
             double3 c = double3(0, 0, 0);
             for (size_t sample = 0; sample < numSamples; sample++)
             {
                 // Generate numSamples in our destination pixels and map them to input pixels
                 const double2 h = hammersley(size_t(sample), iNumSamples);
-                float3 s;
-                dst.getDirectionFor(s, faceIdex, float(x + h[0]), float(y + h[1]));
+                float3 sf;
+                dst.getDirectionFor(sf, faceIdex, float(x + h[0]), float(y + h[1]));
+                double3 s = sf.toDouble();
                 double xf = atan2(s[0], -s[2]) * M_1_PI; // range [-1.0, 1.0]
                 double yf = asin(-s[1]) * (2 * M_1_PI);  // range [-1.0, 1.0]
                 xf = (xf + 1) * 0.5 * (width - 1);       // range [0, width [
                 yf = (yf + 1) * 0.5 * (height - 1);      // range [0, height[
                 // we can't use filterAt() here because it reads past the width/height
                 // which is okay for cubmaps but not for square images
-                const float3 pixel = src.getPixel((uint32_t)xf, (uint32_t)yf);
-                c[0] += pixel[0];
-                c[1] += pixel[1];
-                c[2] += pixel[2];
+                const float3& pixel = src.getPixel((uint32_t)xf, (uint32_t)yf);
+                c[0] += (double)pixel[0];
+                c[1] += (double)pixel[1];
+                c[2] += (double)pixel[2];
             }
             c *= iNumSamples;
             float3& resultPixel = *data;
@@ -609,7 +615,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
 void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
 {
     size_t maxSize = cm.size;
-    size_t numMipMap = log2(maxSize) + 1;
+    size_t numMipMap = (size_t)log2(maxSize) + 1;
 
     cmMipMap.init(numMipMap);
 
@@ -620,7 +626,7 @@ void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
 
     for (size_t i = 1; i < numMipMap; i++)
     {
-        size_t size = pow(2, (numMipMap - 1) - i);
+        size_t size = (size_t)pow(2, (numMipMap - 1) - i);
         envUtils::createCubemap(cmMipMap.levels[i], size);
         envUtils::downsampleCubemapLevelBoxFilter(cmMipMap.levels[i], cmMipMap.levels[i - 1]);
         cmMipMap.levels[i].makeSeamless();
@@ -657,6 +663,15 @@ int writeCubemapMipMapFaces_hdr(const char* dir, const char* basename, const Cub
         writeCubemap_hdr(path, filename, cm);
     }
     return 0;
+}
+
+void freeCubemapMipMap(CubemapMipMap& cmMipMap)
+{
+    for (int i = 0; i < cmMipMap.numLevel; i++)
+    {
+        freeCubemap(cmMipMap.levels[i]);
+    }
+    cmMipMap.numLevel = 0;
 }
 
 } // namespace envUtils

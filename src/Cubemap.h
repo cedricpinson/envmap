@@ -7,8 +7,10 @@
 struct Cubemap
 {
 
+    Image faces[6];
     Image image;
     int size;
+    int padding;
 
     // order in opengl
     enum Face {
@@ -28,7 +30,6 @@ struct Cubemap
         float t = 0;
     };
 
-    Image faces[6];
 
     void setImageForFace(Face face, const Image& image);
     void getDirectionFor(float3& direction, Face face, int x, int y) const;
@@ -47,7 +48,7 @@ inline void Cubemap::getDirectionFor(float3& direction, Face face, int x, int y)
 
 inline void Cubemap::getDirectionFor(float3& direction, Face face, float x, float y) const
 {
-    const float scale = 2.0 / size;
+    const float scale = 2.0f / size;
     // map [0, dim] to [-1,1] with (-1,-1) at bottom left
     float cx = (x * scale) - 1;
     float cy = 1 - (y * scale);

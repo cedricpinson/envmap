@@ -22,9 +22,9 @@ void EvalSHBasis(const float4& dir, double* res)
     // Can be optimize by precomputing constant.
     static const double SqrtPi = sqrt(PI);
 
-    double xx = dir[0];
-    double yy = dir[1];
-    double zz = dir[2];
+    double xx = (double)dir[0];
+    double yy = (double)dir[1];
+    double zz = (double)dir[2];
 
     // x[i] == pow(x, i), etc.
     double x[MAX_SH_ORDER + 1], y[MAX_SH_ORDER + 1], z[MAX_SH_ORDER + 1];
@@ -102,7 +102,7 @@ void EvalSHBasis(const float4& dir, double* res)
 // }
 
 // solid Angle
-template <typename T> T AreaElement(const T x, const T y) { return atan2(x * y, sqrt(x * x + y * y + 1.0f)); }
+template <typename T> T AreaElement(const T x, const T y) { return atan2(x * y, sqrt(x * x + y * y + 1.0)); }
 
 /** Original code from Ignacio Castaño
  * This formula is from Manne Öhrström's thesis.
@@ -114,8 +114,8 @@ inline double texelPixelSolidAngle(const float& aU, const float& aV, const size_
 {
     // transform from [0..res - 1] to [- (1 - 1 / res) .. (1 - 1 / res)]
     // ( 0.5 is for texel center addressing)
-    const double U = (2.0 * (aU + 0.5) / width) - 1.0;
-    const double V = (2.0 * (aV + 0.5) / height) - 1.0;
+    const double U = (2.0 * ((double)aU + 0.5) / width) - 1.0;
+    const double V = (2.0 * ((double)aV + 0.5) / height) - 1.0;
 
     // Shift from a demi texel, mean 1.0 / size  with U and V in [-1..1]
     const double InvResolutionW = 1.0 / width;
@@ -213,9 +213,9 @@ void computeSphericalHarmonicsFromCubemap(double* spherical, const Cubemap& cm)
 
                 // Convert to double
                 const float3& cmTexel = cmFacePtr[x];
-                double R = cmTexel[0];
-                double G = cmTexel[1];
-                double B = cmTexel[2];
+                double R = (double)cmTexel[0];
+                double G = (double)cmTexel[1];
+                double B = (double)cmTexel[2];
 
                 for (int i = 0; i < NUM_SH_COEFFICIENT; i++)
                 {

@@ -4,7 +4,8 @@ const size_t CubemapPrefilterMaxLevel = 16;
 
 struct CubemapMipMap
 {
-    int numLevel;
     Cubemap levels[CubemapPrefilterMaxLevel];
+    int numLevel;
+    int padding;
     void init(int num) { numLevel = num; }
 };

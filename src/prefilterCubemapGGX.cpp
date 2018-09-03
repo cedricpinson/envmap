@@ -11,8 +11,7 @@
 // define this to profile main functions that prefilter
 // also needs to link with profile lib from gperftools
 // then run pprof -top ./envmap ./prefilterCubemapGGX.txt
-#define PROFILER
-
+// #define PROFILER
 
 #ifdef PROFILER
 #include <gperftools/profiler.h>
@@ -27,12 +26,14 @@ struct CacheEntry
     float3 direction;
     float lerp;
     unsigned char l0, l1;
+    unsigned short padding;
 };
 struct CacheSample
 {
     CacheEntry* samples;
     double totalWeight;
     int numSamples;
+    int padding;
 
     void create(int num)
     {
@@ -55,7 +56,7 @@ static void hemisphereImportanceSampleDggx(double3& H, double2 u, double a)
     H[2] = cosTheta;
 }
 
-void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamples, size_t baseResolution)
+void precomputeSamples(CacheSample& cache, double roughnessLinear, size_t numSamples, size_t baseResolution)
 {
     size_t tryNumSamples = numSamples;
 
@@ -66,9 +67,9 @@ void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamp
     const float maxLod = log2(baseResolution);
 
     // Original paper suggest biasing the mip to improve the results
-    float mipBias = 1.0f; // I tested that the result is better with bias 1
+    double mipBias = 1.0; // I tested that the result is better with bias 1
 
-    float invSamples = 1.0 / numSamples;
+    double invSamples = 1.0 / numSamples;
     size_t count = 0;
 
     while (count != numSamples)
@@ -77,7 +78,7 @@ void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamp
 
         // find the sequence to have desired sample hit NoL condition
         cache.totalWeight = 0.0;
-        float hammersleyInvSamples = 1.0 / tryNumSamples;
+        double hammersleyInvSamples = 1.0 / tryNumSamples;
         for (size_t s = 0; s < tryNumSamples && count < numSamples; s++)
         {
 
@@ -137,7 +138,7 @@ void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamp
             // see: "GPU-Based Importance Sampling, GPU Gems 3", Mark Colbert
 
             // Probability Distribution Function
-            double Pdf = D_GGX(NoH, roughnessLinear) / 4.0f;
+            double Pdf = D_GGX(NoH, roughnessLinear) / 4.0;
 
             // Solid angle represented by this sample
             // float omegaS = 1.0 / (numSamples * Pdf);
@@ -163,7 +164,7 @@ void precomputeSamples(CacheSample& cache, float roughnessLinear, size_t numSamp
     }
 } // namespace envUtils
 
-void writeWeightDistribution(const CacheSample& samples, float roughnessLinear, int numSamples, int mipLevel)
+void writeWeightDistribution(const CacheSample& samples, double roughnessLinear, int numSamples, int mipLevel)
 {
     Path path;
     char filename[32];
@@ -175,8 +176,8 @@ void writeWeightDistribution(const CacheSample& samples, float roughnessLinear, 
     {
         const CacheEntry& sample = samples.samples[j];
         // fprintf(fp, "%lf\n", samples.samples[j].direction[2]);
-        fprintf(fp, "%f %f %f, %d %d %f\n", sample.direction[0], sample.direction[1], sample.direction[2], sample.l0,
-                sample.l1, sample.lerp);
+        double3 dir = sample.direction.toDouble();
+        fprintf(fp, "%f %f %f, %d %d %f\n", dir[0], dir[1], dir[2], sample.l0, sample.l1, (double)sample.lerp);
     }
     fclose(fp);
 }
@@ -184,8 +185,8 @@ void writeWeightDistribution(const CacheSample& samples, float roughnessLinear, 
 void computeBasisVector(float3& tangentX, float3& tangentY, const float3& N)
 {
     static float3 axisZ = {0, 0, 1};
-    static float3 axisX = {1, 0, 1};
-    const float3& up = fabs(N[2]) < 0.999 ? axisZ : axisX;
+    static float3 axisX = {1, 0, 0};
+    const float3& up = fabsf(N[2]) < 0.999f ? axisZ : axisX;
     tangentX = normalize(cross(up, N));
     tangentY = normalize(cross(N, tangentX));
 }
@@ -275,14 +276,15 @@ inline void getTrilinear(float3& color, const Cubemap& cubemap0, const Cubemap& 
 struct PrefilterContext
 {
     Cubemap* cubemapDest;
-    Cubemap::Face face;
     const CubemapMipMap* cubemap;
     const CacheSample* samples;
+    Cubemap::Face face;
+    int padding;
     PrefilterContext(Cubemap* cm, Cubemap::Face face, const CubemapMipMap* cmMipMap, const CacheSample* sample)
         : cubemapDest(cm)
-        , face(face)
         , cubemap(cmMipMap)
         , samples(sample)
+        , face(face)
     {}
 };
 
@@ -311,8 +313,8 @@ inline void transformSampleLocal2World(float3& world, const float3& tangentX, co
 void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
 {
 
-    //Showing nodes accounting for 27.52s, 99.89% of 27.55s total
-    //Dropped 1 node (cum <= 0.14s)
+    // Showing nodes accounting for 27.52s, 99.89% of 27.55s total
+    // Dropped 1 node (cum <= 0.14s)
     //      flat  flat%   sum%        cum   cum%
     //       20s 72.60% 72.60%        20s 72.60%  envUtils::getTrilinear
     //     7.52s 27.30% 99.89%     27.44s 99.60%  envUtils::prefilterRangeLines
@@ -361,9 +363,9 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
 
                 getTrilinear(color, lod0, lod1, lWorldSpace, sample.lerp);
 
-                prefilteredColor[0] += color[0] * NoL;
-                prefilteredColor[1] += color[1] * NoL;
-                prefilteredColor[2] += color[2] * NoL;
+                prefilteredColor[0] += (double)(color[0] * NoL);
+                prefilteredColor[1] += (double)(color[1] * NoL);
+                prefilteredColor[2] += (double)(color[2] * NoL);
             }
 
             double invWeight = 1 / samples.totalWeight;
@@ -382,17 +384,17 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
 
     // build mipmap from cmSrc
     int size = cmSrc.levels[0].size;
-    int maxMipMap = log2(size);
+    int maxMipMap = (int)log2(size);
     int numMipMap = maxMipMap + 1;
 
     // init dest result
     cmDst.init(numMipMap);
     for (int i = 0; i < numMipMap; i++)
     {
-        envUtils::createCubemap(cmDst.levels[i], pow(2, maxMipMap - i));
+        envUtils::createCubemap(cmDst.levels[i], (int)pow(2, maxMipMap - i));
     }
 
-    float stepRoughness = 1.0 / float(maxMipMap);
+    double stepRoughness = 1.0 / double(maxMipMap);
 
     char logString[24];
     snprintf(logString, 24, "prefiltering level %d", 0);
@@ -411,8 +413,8 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
     {
         snprintf(logString, 24, "prefiltering level %d", mipLevel);
         t = logStart(logString);
-        float roughness = mipLevel * stepRoughness;
-        float roughnessLinear = roughness * roughness;
+        double roughness = mipLevel * stepRoughness;
+        double roughnessLinear = roughness * roughness;
 
         // frostbite, lagarde paper p67
         // http://www.frostbite.com/wp-content/uploads/2014/11/course_notes_moving_frostbite_to_pbr.pdf

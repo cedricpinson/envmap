@@ -24,6 +24,7 @@ int writeCubemapMipMap_hdr(const char* dir, const char* basename, const CubemapM
 int writeCubemapMipMapFaces_hdr(const char* dir, const char* basename, const CubemapMipMap& cm);
 int writeCubemapMipMap_luv(const char* dir, const char* basename, const CubemapMipMap& cm);
 int readCubemapMipMap_luv(CubemapMipMap& cm, const char* path);
+void freeCubemapMipMap(CubemapMipMap& cmMipMap);
 
 // image
 int loadImage(Image& image, const char* filename);
