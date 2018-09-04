@@ -11,7 +11,8 @@
 // define this to profile main functions that prefilter
 // also needs to link with profile lib from gperftools
 // then run pprof -top ./envmap ./prefilterCubemapGGX.txt
-// #define PROFILER
+// ~/go/bin/pprof -callgrind ./prefilterCubemapGGX.txt  >callgrind.out
+//#define PROFILER
 
 #ifdef PROFILER
 #include <gperftools/profiler.h>
@@ -23,7 +24,7 @@ namespace envUtils {
 
 struct CacheEntry
 {
-    float3 direction;
+    float direction[3];
     float lerp;
     unsigned char l0, l1;
     unsigned short padding;
@@ -172,26 +173,32 @@ void writeWeightDistribution(const CacheSample& samples, double roughnessLinear,
     create_path(path, "test", filename);
     FILE* fp = fopen(path, "w");
     fprintf(fp, "num samples %d mip level %d linear roughness %f\n", numSamples, mipLevel, roughnessLinear);
+    double dir[3];
     for (int j = 0; j < numSamples; j++)
     {
         const CacheEntry& sample = samples.samples[j];
         // fprintf(fp, "%lf\n", samples.samples[j].direction[2]);
-        double3 dir = sample.direction.toDouble();
+        float3ToDouble3(dir, sample.direction);
         fprintf(fp, "%f %f %f, %d %d %f\n", dir[0], dir[1], dir[2], sample.l0, sample.l1, (double)sample.lerp);
     }
     fclose(fp);
 }
 
-void computeBasisVector(float3& tangentX, float3& tangentY, const float3& N)
+inline void computeBasisVector(float* tangentX, float* tangentY, const float* N)
 {
-    static float3 axisZ = {0, 0, 1};
-    static float3 axisX = {1, 0, 0};
-    const float3& up = fabsf(N[2]) < 0.999f ? axisZ : axisX;
-    tangentX = normalize(cross(up, N));
-    tangentY = normalize(cross(N, tangentX));
+    static float axisZ[3] = {0, 0, 1};
+    static float axisX[3] = {1, 0, 0};
+    const float* up = fabsf(N[2]) < 0.999f ? axisZ : axisX;
+
+    float tmp[3];
+    cross(tmp, up, N);
+    normalize(tangentX, tmp);
+
+    cross(tmp, N, tangentX);
+    normalize(tangentY, tmp);
 }
 
-void getAddressFor(Cubemap::Address& addr, const float3& r)
+inline void getAddressFor(Cubemap::Address& addr, const float* r)
 {
     float sc, tc, ma;
     const float rx = fabs(r[0]);
@@ -250,13 +257,13 @@ void getAddressFor(Cubemap::Address& addr, const float3& r)
     addr.t = (tc / ma + 1.f) * 0.5f;
 }
 
-inline void getTrilinear(float3& color, const Cubemap& cubemap0, const Cubemap& cubemap1, const float3& direction,
-                         float lerpFactor)
+void getTrilinear(float* color, const Cubemap& cubemap0, const Cubemap& cubemap1, const float* direction,
+                  float lerpFactor)
 {
     Cubemap::Address address;
     getAddressFor(address, direction);
 
-    float3 color0, color1;
+    float color0[3], color1[3];
     const Image& lod0 = cubemap0.faces[address.face];
     const Image& lod1 = cubemap1.faces[address.face];
 
@@ -301,8 +308,8 @@ struct PrefilterContext
 //     L[2] = l[2] * (t + c);
 // }
 
-inline void transformSampleLocal2World(float3& world, const float3& tangentX, const float3& tangentY,
-                                       const float3& direction, const float3& local)
+inline void transformSampleLocal2World(float* world, const float* tangentX, const float* tangentY,
+                                       const float* direction, const float* local)
 {
     // lWorldSpace = tangentX * Lr[0] + tangentY * Lr[1] + direction * Lr[2]);
     world[0] = tangentX[0] * local[0] + tangentY[0] * local[1] + direction[0] * local[2];
@@ -312,13 +319,6 @@ inline void transformSampleLocal2World(float3& world, const float3& tangentX, co
 
 void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
 {
-
-    // Showing nodes accounting for 27.52s, 99.89% of 27.55s total
-    // Dropped 1 node (cum <= 0.14s)
-    //      flat  flat%   sum%        cum   cum%
-    //       20s 72.60% 72.60%        20s 72.60%  envUtils::getTrilinear
-    //     7.52s 27.30% 99.89%     27.44s 99.60%  envUtils::prefilterRangeLines
-
     const CacheSample& samples = *context.samples;
     Cubemap& cubemapDest = *context.cubemapDest;
     const CubemapMipMap& cubemap = *context.cubemap;
@@ -327,20 +327,23 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
     int size = cubemapDest.size;
     Image& face = cubemapDest.faces[faceIndex];
 
-    float3 tangentX;
-    float3 tangentY;
-    float3 direction;
-    float3 color;
-    float3 lWorldSpace, Lr;
-    double3 prefilteredColor;
+    float tangentX[3];
+    float tangentY[3];
+    float direction[3];
+    float color[3];
+    float lWorldSpace[3];
+    double prefilteredColor[3];
 
     for (int y = yStart; y <= yStop; ++y)
     {
 
-        float3* line = &face.getPixel(0, y);
+        float* line = face.getPixel(0, y).ptr();
         for (int x = 0; x < size; x++)
         {
-            prefilteredColor = {0, 0, 0};
+            prefilteredColor[0] = 0;
+            prefilteredColor[1] = 0;
+            prefilteredColor[2] = 0;
+
             cubemapDest.getDirectionFor(direction, faceIndex, x, y);
 
             computeBasisVector(tangentX, tangentY, direction);
@@ -352,7 +355,7 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
             for (int i = 0; i < samples.numSamples; i++)
             {
                 const CacheEntry& sample = samples.samples[i];
-                const float3& L = sample.direction;
+                const float* L = sample.direction;
 
                 float NoL = L[2];
 
@@ -370,9 +373,9 @@ void prefilterRangeLines(PrefilterContext context, int yStart, int yStop)
 
             double invWeight = 1 / samples.totalWeight;
 
-            line[x][0] = (float)(prefilteredColor[0] * invWeight);
-            line[x][1] = (float)(prefilteredColor[1] * invWeight);
-            line[x][2] = (float)(prefilteredColor[2] * invWeight);
+            line[x * 3 + 0] = (float)(prefilteredColor[0] * invWeight);
+            line[x * 3 + 1] = (float)(prefilteredColor[1] * invWeight);
+            line[x * 3 + 2] = (float)(prefilteredColor[2] * invWeight);
         }
     }
 }

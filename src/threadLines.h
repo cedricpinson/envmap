@@ -3,7 +3,7 @@
 #include <math.h>
 #include <thread>
 
-//#define USE_THREAD
+#define USE_THREAD
 
 template <class T, class ArgObject> void threadLines(T* func, ArgObject context, int nbLines, int nbThread)
 {
@@ -24,7 +24,7 @@ template <class T, class ArgObject> void threadLines(T* func, ArgObject context,
     int stopY;
     for (int i = 0; i < nbThread; i++)
     {
-        stopY = startY + ceil(linesPerThread);
+        stopY = startY + (int)ceilf(linesPerThread);
         if (stopY > nbLines - 1)
             stopY = nbLines - 1;
 

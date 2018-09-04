@@ -160,7 +160,7 @@ void computeSphericalHarmonicsFromCubemap(double* spherical, const Cubemap& cm)
             for (int u = 0; u < size; u++)
             {
                 // texelCoordToVectCubeMap(texelPtr, iCubeFace, (float)u, (float)v, size, 0);
-                cm.getDirectionFor(dir, (Cubemap::Face)iCubeFace, u, v);
+                cm.getDirectionFor(dir.ptr(), (Cubemap::Face)iCubeFace, u, v);
                 double solidAngle = texelPixelSolidAngle(u, v, size, size);
                 (*texelPtr)[0] = dir[0];
                 (*texelPtr)[1] = dir[1];

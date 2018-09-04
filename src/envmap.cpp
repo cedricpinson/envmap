@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <thread>
 
-static bool debug = true;
+static bool debug = false;
 
 int main(int argc, char** argv)
 {

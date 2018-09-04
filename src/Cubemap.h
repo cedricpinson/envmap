@@ -32,21 +32,19 @@ struct Cubemap
 
 
     void setImageForFace(Face face, const Image& image);
-    void getDirectionFor(float3& direction, Face face, int x, int y) const;
-    void getDirectionFor(float3& direction, Face face, float x, float y) const;
-    void getPixelFromDirection(float3& pixel, const float3& direction) const;
+    void getDirectionFor(float* direction, Face face, int x, int y) const;
+    void getDirectionFor(float* direction, Face face, float x, float y) const;
     void setAllFacesFromCross(const Image& image);
-    Address getAddressFor(const float3& r) const;
 
     void makeSeamless();
 };
 
-inline void Cubemap::getDirectionFor(float3& direction, Face face, int x, int y) const
+inline void Cubemap::getDirectionFor(float* direction, Face face, int x, int y) const
 {
     getDirectionFor(direction, face, x + 0.5f, y + 0.5f);
 }
 
-inline void Cubemap::getDirectionFor(float3& direction, Face face, float x, float y) const
+inline void Cubemap::getDirectionFor(float* direction, Face face, float x, float y) const
 {
     const float scale = 2.0f / size;
     // map [0, dim] to [-1,1] with (-1,-1) at bottom left
@@ -57,24 +55,38 @@ inline void Cubemap::getDirectionFor(float3& direction, Face face, float x, floa
     switch (face)
     {
     case PX:
-        direction.set(1, cy, -cx);
+        direction[0] = 1;
+        direction[1] = cy;
+        direction[2] = -cx;
         break;
     case NX:
-        direction.set(-1, cy, cx);
+        direction[0] = -1;
+        direction[1] = cy;
+        direction[2] = cx;
         break;
     case PY:
-        direction.set(cx, 1, -cy);
+        direction[0] = cx;
+        direction[1] = 1;
+        direction[2] = -cy;
         break;
     case NY:
-        direction.set(cx, -1, cy);
+        direction[0] = cx;
+        direction[1] = -1;
+        direction[2] = cy;
         break;
     case PZ:
-        direction.set(cx, cy, 1);
+        direction[0] = cx;
+        direction[1] = cy;
+        direction[2] = 1;
         break;
     case NZ:
-        direction.set(-cx, cy, -1);
+        direction[0] = -cx;
+        direction[1] = cy;
+        direction[2] = -1;
         break;
     }
 
-    direction *= 1 / l;
+    direction[0] *= 1 / l;
+    direction[1] *= 1 / l;
+    direction[2] *= 1 / l;
 }

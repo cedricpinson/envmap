@@ -17,7 +17,7 @@ add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/Image.cpp src/Cubemap.cpp )
 
 target_link_libraries(envmap pthread)
-target_compile_options(envmap PRIVATE -Wall -Wextra -pedantic -Werror -Wdouble-promotion -Wmissing-variable-declarations -Wfloat-conversion -Wpadded -g -c)
+target_compile_options(envmap PRIVATE -Wall -Wextra -pedantic -Werror -Wdouble-promotion -Wmissing-variable-declarations -Wfloat-conversion -Wpadded -g)
 
 install(TARGETS envmap
 RUNTIME DESTINATION bin

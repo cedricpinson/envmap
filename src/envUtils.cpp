@@ -536,13 +536,13 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
             // y = -sin(phi)
             // z = -cos(phi) cos(theta)
             float3 s0f;
-            dst.getDirectionFor(s0f, faceIdex, x, y);
+            dst.getDirectionFor(s0f.ptr(), faceIdex, x, y);
             double3 s0 = s0f.toDouble();
 
             const double t0 = atan2(s0[0], -s0[2]);
             const double p0 = asin(s0[1]);
             float3 s1f;
-            dst.getDirectionFor(s1f, faceIdex, x + 1, y + 1);
+            dst.getDirectionFor(s1f.ptr(), faceIdex, x + 1, y + 1);
             double3 s1 = s1f.toDouble();
 
             const double t1 = atan2(s1[0], -s1[2]);
@@ -560,7 +560,7 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
                 // Generate numSamples in our destination pixels and map them to input pixels
                 const double2 h = hammersley(size_t(sample), iNumSamples);
                 float3 sf;
-                dst.getDirectionFor(sf, faceIdex, float(x + h[0]), float(y + h[1]));
+                dst.getDirectionFor(sf.ptr(), faceIdex, float(x + h[0]), float(y + h[1]));
                 double3 s = sf.toDouble();
                 double xf = atan2(s[0], -s[2]) * M_1_PI; // range [-1.0, 1.0]
                 double yf = asin(-s[1]) * (2 * M_1_PI);  // range [-1.0, 1.0]
@@ -606,7 +606,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
             float3* dstLine = &dst.faces[f].getPixel(0, y);
             for (int x = 0; x < dim; ++x)
             {
-                srcFace.filterAt(dstLine[x], x * scale + 0.5, y * scale + 0.5);
+                srcFace.filterAt(dstLine[x].ptr(), x * scale + 0.5, y * scale + 0.5);
             }
         }
     }

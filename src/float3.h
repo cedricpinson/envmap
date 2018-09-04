@@ -152,6 +152,7 @@ template <typename T> struct Vec3Type
     Vec3Type()
         : _v{0, 0, 0}
     {}
+
     Vec3Type(value_type x, value_type y, value_type z)
         : _v{x, y, z}
     {}
@@ -177,10 +178,7 @@ template <typename T> struct Vec3Type
     inline value_type* ptr() { return _v; }
     inline const value_type* ptr() const { return _v; }
 
-    Vec3Type<double> toDouble() const
-    {
-        return Vec3Type<double>((double)_v[0], (double)_v[1], (double)_v[2]);
-    }
+    Vec3Type<double> toDouble() const { return Vec3Type<double>((double)_v[0], (double)_v[1], (double)_v[2]); }
 
     inline void set(value_type x, value_type y, value_type z)
     {
@@ -302,7 +300,6 @@ template <typename T> struct Vec3Type
         }
         return (norm);
     }
-
 }; // end of class Vec3Type
 
 typedef Vec3Type<float> float3;
@@ -481,4 +478,24 @@ template <typename T> inline T frac(T v) { return v - floor(v); }
 template <typename T> inline T clamp(T v, T minimum, T maximum)
 {
     return v < minimum ? minimum : v > maximum ? maximum : v;
+}
+
+template <typename T> inline void cross(T* result, const T* a, const T* b)
+{
+    result[0] = a[1] * b[2] - a[2] * b[1];
+    result[1] = a[2] * b[0] - a[0] * b[2];
+    result[2] = a[0] * b[1] - a[1] * b[0];
+}
+template <typename T> inline void normalize(T* result, const T* a)
+{
+    T l = 1.0f / sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+    result[0] = a[0] * l;
+    result[1] = a[1] * l;
+    result[2] = a[2] * l;
+}
+inline void float3ToDouble3(double* result, const float* a)
+{
+    result[0] = (double)a[0];
+    result[1] = (double)a[1];
+    result[2] = (double)a[2];
 }
