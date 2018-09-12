@@ -198,70 +198,11 @@ inline void computeBasisVector(float* tangentX, float* tangentY, const float* N)
     normalize(tangentY, tmp);
 }
 
-inline void getAddressFor(Cubemap::Address& addr, const float* r)
-{
-    float sc, tc, ma;
-    const float rx = fabs(r[0]);
-    const float ry = fabs(r[1]);
-    const float rz = fabs(r[2]);
-    if (rx >= ry && rx >= rz)
-    {
-        ma = rx;
-        if (r[0] >= 0)
-        {
-            addr.face = Cubemap::Face::PX;
-            sc = -r[2];
-            tc = -r[1];
-        }
-        else
-        {
-            addr.face = Cubemap::Face::NX;
-            sc = r[2];
-            tc = -r[1];
-        }
-    }
-    else if (ry >= rx && ry >= rz)
-    {
-        ma = ry;
-        if (r[1] >= 0)
-        {
-            addr.face = Cubemap::Face::PY;
-            sc = r[0];
-            tc = r[2];
-        }
-        else
-        {
-            addr.face = Cubemap::Face::NY;
-            sc = r[0];
-            tc = -r[2];
-        }
-    }
-    else
-    {
-        ma = rz;
-        if (r[2] >= 0)
-        {
-            addr.face = Cubemap::Face::PZ;
-            sc = r[0];
-            tc = -r[1];
-        }
-        else
-        {
-            addr.face = Cubemap::Face::NZ;
-            sc = -r[0];
-            tc = -r[1];
-        }
-    }
-    // ma is guaranteed to be >= sc and tc
-    addr.s = (sc / ma + 1.f) * 0.5f;
-    addr.t = (tc / ma + 1.f) * 0.5f;
-}
-
 void getTrilinear(float* color, const Cubemap& cubemap0, const Cubemap& cubemap1, const float* direction,
                   float lerpFactor)
 {
     Cubemap::Address address;
-    getAddressFor(address, direction);
+    Cubemap::getAddressFor(address, direction);
 
     float color0[3], color1[3];
     const Image& lod0 = cubemap0.faces[address.face];
@@ -406,6 +347,7 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
     // copy for roughness = 0;
     memcpy(cmDst.levels[0].image.data, cmSrc.levels[0].image.data,
            cmSrc.levels[0].image.width * cmSrc.levels[0].image.height * sizeof(float3));
+    cmDst.levels[0].makeSeamless();
 
     logEnd(t);
 
@@ -436,6 +378,9 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
             threadLines(prefilterRangeLines, context, nbLines, nbThread);
         }
         logEnd(t);
+
+        // needed for the remapping for webgl1 seamless cubemap
+        cmDst.levels[mipLevel].makeSeamless();
     }
 
     cacheSamples.free();
@@ -443,6 +388,86 @@ void prefilterCubemapGGX(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, size_
 #ifdef PROFILER
     ProfilerStop();
 #endif
+}
+
+struct ResampleContext
+{
+    Cubemap* cubemapDest;
+    const Cubemap* cubemap;
+    Cubemap::Face face;
+    int padding;
+    ResampleContext(Cubemap* cm, Cubemap::Face face, const Cubemap* cmSrc)
+        : cubemapDest(cm)
+        , cubemap(cmSrc)
+        , face(face)
+    {}
+};
+
+// resample for seamless cubemap edge for webgl1 and more generally without extension seamless cubemap on gpu
+// https://seblagarde.wordpress.com/2012/06/10/amd-cubemapgen-for-physically-based-rendering/
+// http://code.google.com/p/nvidia-texture-tools/source/browse/trunk/src/nvtt/CubeSurface.cpp
+void resampleCubemapRangeLines(ResampleContext context, int yStart, int yStop)
+{
+    Cubemap& cubemapDest = *context.cubemapDest;
+    const Cubemap& cubemap = *context.cubemap;
+    Cubemap::Face faceIndex = context.face;
+    Cubemap::Address address;
+
+    float size = cubemap.size;
+    float direction[3];
+    float color[3];
+    float x0, y0;
+
+    for (int y = yStart; y <= yStop; ++y)
+    {
+
+        float* line = cubemapDest.faces[faceIndex].getPixel(0, y).ptr();
+        for (int x = 0; x < size; x++)
+        {
+            cubemap.getDirectionFixUpFor(direction, faceIndex, x, y);
+            Cubemap::getAddressFor(address, direction);
+
+            const Image& image = cubemap.faces[address.face];
+            x0 = address.s * image.width;
+            y0 = address.t * image.width;
+
+            image.filterAt(color, x0, y0);
+
+            *line++ = color[0];
+            *line++ = color[1];
+            *line++ = color[2];
+        }
+    }
+}
+
+void resampleCubemap(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, int nbThreads)
+{
+    auto t = logStart("resampling for seamless cubemap");
+
+    // build mipmap from cmSrc
+    int numMipMap = cmSrc.numLevel;
+    cmDst.init(numMipMap);
+
+    for (int i = 0; i < numMipMap; i++)
+    {
+        envUtils::createCubemap(cmDst.levels[i], cmSrc.levels[i].size);
+    }
+
+    for (int mipLevel = 0; mipLevel < numMipMap; mipLevel++)
+    {
+        const Cubemap* src = &cmSrc.levels[mipLevel];
+        Cubemap* dst = &cmDst.levels[mipLevel];
+        int nbLines = dst->size;
+
+        // iterate on each face
+        for (int face = 0; face < 6; face++)
+        {
+            ResampleContext context(dst, (Cubemap::Face)face, src);
+            threadLines(resampleCubemapRangeLines, context, nbLines, nbThreads);
+        }
+    }
+
+    logEnd(t);
 }
 
 } // namespace envUtils

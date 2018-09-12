@@ -38,7 +38,7 @@ void printUsage()
         " -d a debug flag to write intermediate texture"
         " -m [--no-threads] no multithreading, default is false";
 
-        printf("%s", text);
+    printf("%s", text);
 }
 
 int parseArgument(Options& options, int argc, char** argv)
@@ -49,12 +49,9 @@ int parseArgument(Options& options, int argc, char** argv)
 
     static const char* OPTSTR = "hdms:n:";
     static const struct option OPTIONS[] = {
-        {"help", no_argument, nullptr, 'h'},
-        {"ibl-sample", required_argument, nullptr, 'n'},
-        {"ibl-size", required_argument, nullptr, 's'},
-        {"no-threads", no_argument, nullptr, 's'},
-        {"debug", no_argument, nullptr, 'd'},
-        {nullptr, 0, 0, 0} // termination of the option list
+        {"help", no_argument, nullptr, 'h'},           {"ibl-sample", required_argument, nullptr, 'n'},
+        {"ibl-size", required_argument, nullptr, 's'}, {"no-threads", no_argument, nullptr, 's'},
+        {"debug", no_argument, nullptr, 'd'},          {nullptr, 0, 0, 0} // termination of the option list
     };
 
     while ((opt = getopt_long(argc, argv, OPTSTR, OPTIONS, &optionIndex)) >= 0)
@@ -107,7 +104,8 @@ int main(int argc, char** argv)
     if (loadImageResult == 0)
     {
 
-        if (!options.nbThreads) {
+        if (!options.nbThreads)
+        {
             options.nbThreads = (int)std::thread::hardware_concurrency();
         }
         printf("using %d threads\n", options.nbThreads);
@@ -133,13 +131,21 @@ int main(int argc, char** argv)
         CubemapMipMap cmPrefilter;
         envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, options.numSamples, options.nbThreads);
 
+        Image equirectangular;
+        envUtils::createImage(equirectangular, options.cubemapSize * 4, options.cubemapSize * 2);
+        envUtils::cubemapToEquirectangular(equirectangular, cmMipMap.levels[0], options.nbThreads);
+        envUtils::writeImage_hdr("equirectangular", equirectangular);
+
+        CubemapMipMap cmPrefilterFixUp;
+        envUtils::resampleCubemap(cmPrefilterFixUp, cmPrefilter, options.nbThreads);
+
         if (options.debug)
             envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter", cmPrefilter);
 
         Spherical spherical;
         envUtils::computeSphericalHarmonicsFromCubemap(spherical, cm);
         envUtils::writeSpherical_json(distDir, "spherical", spherical);
-        envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilter);
+        envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilterFixUp);
 
         if (options.debug)
         {
@@ -151,6 +157,7 @@ int main(int argc, char** argv)
 
         envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
 
+        envUtils::freeCubemapMipMap(cmPrefilterFixUp);
         envUtils::freeCubemapMipMap(cmPrefilter);
         envUtils::freeCubemapMipMap(cmMipMap);
         envUtils::freeImage(image);

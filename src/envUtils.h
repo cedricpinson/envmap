@@ -10,6 +10,7 @@ namespace envUtils {
 void initCubemap(Cubemap& cm, const Image& image);
 void createCubemap(Cubemap& cm, int size);
 void equirectangularToCubemap(Cubemap& dest, const Image& equi, int nbThread);
+void cubemapToEquirectangular(Image& dst, const Cubemap& src, int nbThread);
 void writeCubemap_hdr(const char* dir, const char* filename, const Cubemap& cm);
 int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm);
 void freeCubemap(Cubemap& cm);
@@ -17,6 +18,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src);
 
 // prefilterCubemapGGX
 void prefilterCubemapGGX(CubemapMipMap& cmResult, const CubemapMipMap& cmSourceMipMap, size_t numSamples, int nbThread);
+void resampleCubemap(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, int nbThreads);
 
 // cubemap mipmap
 void createCubemapMipMap(CubemapMipMap& cmResultMipMap, const Cubemap& cmSource);

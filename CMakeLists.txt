@@ -10,6 +10,7 @@ include_directories(SYSTEM "deps/")
 
 add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/computeSphericalHarmonicsFromCubemap.cpp
+  src/environmentConversion.cpp
   src/prefilterCubemapGGX.cpp
   src/utils.cpp
   src/log.cpp
