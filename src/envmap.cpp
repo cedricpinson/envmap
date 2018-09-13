@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "Spherical.h"
 #include "envUtils.h"
+#include "utils.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <thread>
@@ -13,6 +14,7 @@ struct Options
     int numSamples = 1024;
     int cubemapSize = 256;
     const char* inputFilename;
+    const char* distDir = "dist";
     int thumbnailSize = 256;
     int nbThreads = 0;
     bool debug = false;
@@ -96,9 +98,20 @@ int main(int argc, char** argv)
     }
 
     options.inputFilename = argv[optionIndex];
+    if (numArgs > 1)
+    {
+        options.distDir = argv[optionIndex + 1];
+    }
+
+    printf("writing result to %s\n", options.distDir);
+    if (makeDirectory(options.distDir))
+    {
+        printf("can't create director %s\n", options.distDir);
+        return 1;
+    }
 
     Image image;
-    const char* distDir = "test";
+    const char* distDir = options.distDir;
 
     int loadImageResult = envUtils::loadImage(image, options.inputFilename);
     if (loadImageResult == 0)
@@ -132,9 +145,11 @@ int main(int argc, char** argv)
         envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, options.numSamples, options.nbThreads);
 
         Image equirectangular;
-        envUtils::createImage(equirectangular, options.cubemapSize * 4, options.cubemapSize * 2);
-        envUtils::cubemapToEquirectangular(equirectangular, cmMipMap.levels[0], options.nbThreads);
-        envUtils::writeImage_hdr("equirectangular", equirectangular);
+        envUtils::packPrefilterCubemapToEquilateral(equirectangular, cmPrefilter, options.nbThreads);
+        if (options.debug)
+        {
+            envUtils::writeImage_hdr(distDir, "equirectangular", equirectangular);
+        }
 
         CubemapMipMap cmPrefilterFixUp;
         envUtils::resampleCubemap(cmPrefilterFixUp, cmPrefilter, options.nbThreads);
@@ -156,10 +171,12 @@ int main(int argc, char** argv)
         }
 
         envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
+        envUtils::writeImage_luv(distDir, "equirectangular", equirectangular);
 
         envUtils::freeCubemapMipMap(cmPrefilterFixUp);
         envUtils::freeCubemapMipMap(cmPrefilter);
         envUtils::freeCubemapMipMap(cmMipMap);
+        envUtils::freeImage(equirectangular);
         envUtils::freeImage(image);
         envUtils::freeCubemap(cm);
     }

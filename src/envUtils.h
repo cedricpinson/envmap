@@ -19,6 +19,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src);
 // prefilterCubemapGGX
 void prefilterCubemapGGX(CubemapMipMap& cmResult, const CubemapMipMap& cmSourceMipMap, size_t numSamples, int nbThread);
 void resampleCubemap(CubemapMipMap& cmDst, const CubemapMipMap& cmSrc, int nbThreads);
+void packPrefilterCubemapToEquilateral(Image& equirectangular, const CubemapMipMap& src, int nbThreads);
 
 // cubemap mipmap
 void createCubemapMipMap(CubemapMipMap& cmResultMipMap, const Cubemap& cmSource);
@@ -30,7 +31,8 @@ void freeCubemapMipMap(CubemapMipMap& cmMipMap);
 
 // image
 int loadImage(Image& image, const char* filename);
-int writeImage_hdr(const char* filename, const Image& image);
+int writeImage_hdr(const char* dir, const char* filename, const Image& image);
+int writeImage_luv(const char* dir, const char* filename, const Image& image);
 void createImage(Image& image, int width, int height);
 void freeImage(Image& image);
 void clampImage(Image& src, float maxValue = 255);

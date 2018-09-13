@@ -139,11 +139,12 @@ void createImage(Image& image, int width, int height)
     image.type = Image::RAW;
 }
 
-int writeImage_hdr(const char* filename, const Image& image)
+int writeImage_hdr(const char* dir, const char* filename, const Image& image)
 {
     Path path;
-    strncpy(path, filename, 1024);
-    const char* extension = get_filename_ext(path);
+    createPath(path, dir, filename);
+
+    const char* extension = getFilenameExtension(path);
     if (strlen(extension) == 0)
     {
         strcat(path, ".hdr");
@@ -168,6 +169,49 @@ int writeImage_hdr(const char* filename, const Image& image)
     int ret = stbi_write_hdr(path, image.width, image.height, 3, (float*)data);
     delete[] data;
     return ret;
+}
+
+int writeImage_luv(const char* dir, const char* filename, const Image& image)
+{
+    Path path;
+    createPath(path, dir, filename);
+
+    const char* extension = getFilenameExtension(path);
+    if (strlen(extension) == 0)
+    {
+        strcat(path, ".luv");
+    }
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    printf("writing %s file\n", path);
+
+    int w = image.width;
+    int h = image.height;
+    uint8_t* dest = new uint8_t[w * h * 4];
+    uint8_t rgba8[4];
+    for (int y = 0; y < image.height; y++)
+    {
+        const float3* lineSrc = &image.getPixel(0, y);
+        for (int x = 0; x < image.width; x++)
+        {
+            // interleave the face
+            encodeLUV(rgba8, lineSrc[x].ptr());
+            dest[y * w + x + (w * h * 0)] = rgba8[0];
+            dest[y * w + x + (w * h * 1)] = rgba8[1];
+            dest[y * w + x + (w * h * 2)] = rgba8[2];
+            dest[y * w + x + (w * h * 3)] = rgba8[3];
+        }
+    }
+
+    fwrite(dest, w * h * 4, 1, fp);
+    delete[] dest;
+    return 0;
 }
 
 int writeImage_ldr(const char* filename, const Image& image)
@@ -253,7 +297,7 @@ int writeThumbnail(const char* dir, const char* basename, const Image& image, in
 
 int loadImage(Image& image, const char* filename)
 {
-    const char* ext = get_filename_ext(filename);
+    const char* ext = getFilenameExtension(filename);
     printf("reading file %s\n", filename);
     if (strncmp(ext, "exr", 3) == 0)
     {
@@ -330,21 +374,16 @@ const char* getCubemapFaceName(Cubemap::Face face)
 
 void writeCubemap_hdr(const char* dir, const char* basename, const Cubemap& cm)
 {
-    make_directory(dir);
-
-    Path path;
     char filename[512];
     for (int f = 0; f < 6; f++)
     {
         snprintf(filename, 511, "%s_%s", basename, envUtils::getCubemapFaceName((Cubemap::Face)f));
-        create_path(path, dir, filename);
         const Image& image = cm.faces[f];
-        writeImage_hdr(path, image);
+        writeImage_hdr(dir, filename, image);
     }
 
     snprintf(filename, 511, "%s_%s", basename, "cross");
-    create_path(path, dir, filename);
-    writeImage_hdr(path, cm.image);
+    writeImage_hdr(dir, filename, cm.image);
 }
 
 #define ENTERLEAVE
@@ -428,12 +467,10 @@ static void writeCubemap_luv_internal(FILE* fp, uint8_t* tempBuffer, const Cubem
 
 int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm)
 {
-    make_directory(dir);
-
     Path path;
     char filename[511];
     snprintf(filename, 511, "%s.luv", basename);
-    create_path(path, dir, filename);
+    createPath(path, dir, filename);
 
     printf("writing %s file\n", path);
 
@@ -457,12 +494,10 @@ int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm)
 
 int writeCubemapMipMap_luv(const char* dir, const char* basename, const CubemapMipMap& cmMipMap)
 {
-    make_directory(dir);
-
     Path path;
     char filename[511];
     snprintf(filename, 511, "%s.luv", basename);
-    create_path(path, dir, filename);
+    createPath(path, dir, filename);
 
     printf("writing %s file\n", path);
 
@@ -500,7 +535,6 @@ void clampImage(Image& src, float maxValue)
     }
 }
 
-
 void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
 {
     int scale = 2;
@@ -522,6 +556,7 @@ void downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src)
 
 void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
 {
+    auto t = logStart("createCubemapMipMap");
     size_t maxSize = cm.size;
     size_t numMipMap = (size_t)log2(maxSize) + 1;
 
@@ -539,34 +574,29 @@ void createCubemapMipMap(CubemapMipMap& cmMipMap, const Cubemap& cm)
         envUtils::downsampleCubemapLevelBoxFilter(cmMipMap.levels[i], cmMipMap.levels[i - 1]);
         cmMipMap.levels[i].makeSeamless();
     }
+    logEnd(t);
 }
 
 int writeCubemapMipMap_hdr(const char* dir, const char* basename, const CubemapMipMap& cm)
 {
-    make_directory(dir);
-
-    Path path;
     char filename[256];
     for (int i = 0; i < cm.numLevel; i++)
     {
         snprintf(filename, 255, "%s_level_%d", basename, i);
-        create_path(path, dir, filename);
         const Image& image = cm.levels[i].image;
-        writeImage_hdr(path, image);
+        writeImage_hdr(dir, filename, image);
     }
     return 0;
 }
 
 int writeCubemapMipMapFaces_hdr(const char* dir, const char* basename, const CubemapMipMap& cmMipMap)
 {
-    make_directory(dir);
-
     Path path;
     char filename[256];
     for (int i = 0; i < cmMipMap.numLevel; i++)
     {
         snprintf(filename, 255, "%s_level_%d", basename, i);
-        create_path(path, dir, filename);
+        createPath(path, dir, filename);
         const Cubemap& cm = cmMipMap.levels[i];
         writeCubemap_hdr(path, filename, cm);
     }
@@ -582,7 +612,29 @@ void freeCubemapMipMap(CubemapMipMap& cmMipMap)
     cmMipMap.numLevel = 0;
 }
 
+void packPrefilterCubemapToEquilateral(Image& equirectangular, const CubemapMipMap& src, int nbThreads)
+{
 
+    auto t = logStart("cubemapToEquirectangular");
+    int numMipMap = src.numLevel;
+    int cubemapSize = src.levels[0].size;
 
+    // image that will contains mipmap of panorama
+    envUtils::createImage(equirectangular, cubemapSize * 4, cubemapSize * 4);
+
+    int sizeLevel;
+    int yOffset = 0;
+    Image equirectangularLevel;
+
+    for (int i = 0; i < numMipMap; i++)
+    {
+        sizeLevel = src.levels[i].size;
+        equirectangularLevel.subset(equirectangular, 0, yOffset, sizeLevel * 4, sizeLevel * 2);
+        envUtils::cubemapToEquirectangular(equirectangularLevel, src.levels[i], nbThreads);
+        yOffset += sizeLevel * 2;
+    }
+
+    logEnd(t);
+}
 
 } // namespace envUtils

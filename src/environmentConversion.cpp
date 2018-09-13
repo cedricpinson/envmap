@@ -154,13 +154,11 @@ void cubemapToEquirectangularLines(CubemapToEquirectangularProcessContext contex
 
 void cubemapToEquirectangular(Image& dst, const Cubemap& src, int nbThread)
 {
-    auto t = logStart("cubemapToEquirectangular");
     for (int f = 0; f < 6; f++)
     {
         CubemapToEquirectangularProcessContext context(&dst, &src);
         threadLines(cubemapToEquirectangularLines, context, dst.height, nbThread);
     }
-    logEnd(t);
 }
 
 } // namespace envUtils

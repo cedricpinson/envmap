@@ -170,7 +170,7 @@ void writeWeightDistribution(const CacheSample& samples, double roughnessLinear,
     Path path;
     char filename[32];
     snprintf(filename, 31, "sample_%d_%d.data", mipLevel, numSamples);
-    create_path(path, "test", filename);
+    createPath(path, "test", filename);
     FILE* fp = fopen(path, "w");
     fprintf(fp, "num samples %d mip level %d linear roughness %f\n", numSamples, mipLevel, roughnessLinear);
     double dir[3];
