@@ -3,6 +3,7 @@
 #include "Spherical.h"
 #include "envUtils.h"
 #include "utils.h"
+#include "package.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <thread>
@@ -129,7 +130,9 @@ int main(int argc, char** argv)
 
         envUtils::clampImage(image, 255);
 
-        envUtils::writeThumbnail(distDir, "thumbnail", image, options.thumbnailSize, options.thumbnailSize / 2);
+        Image thumbnail;
+        envUtils::createThumbnail(thumbnail, image, options.thumbnailSize, options.thumbnailSize / 2);
+
         envUtils::equirectangularToCubemap(cm, image, options.nbThreads);
 
         if (options.debug)
@@ -159,8 +162,6 @@ int main(int argc, char** argv)
 
         Spherical spherical;
         envUtils::computeSphericalHarmonicsFromCubemap(spherical, cm);
-        envUtils::writeSpherical_json(distDir, "spherical", spherical);
-        envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilterFixUp);
 
         if (options.debug)
         {
@@ -170,8 +171,21 @@ int main(int argc, char** argv)
             envUtils::freeCubemapMipMap(cmDecode);
         }
 
-        envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
-        envUtils::writeImage_luv(distDir, "equirectangular", equirectangular);
+        pkg::Package package(distDir);
+
+        package.setSph(&spherical);
+        package.addThumbnail(thumbnail);
+        package.addPrefilterCubemap(cmPrefilterFixUp, pkg::ImageEncoding::luv);
+        package.addPrefilterEquirectangular(equirectangular, pkg::ImageEncoding::luv);
+        package.addBackground(cmPrefilter.levels[2], pkg::ImageEncoding::luv);
+
+        package.write();
+
+        // envUtils::writeThumbnail(distDir, "thumbnail", image, options.thumbnailSize, options.thumbnailSize / 2);
+        // envUtils::writeSpherical_json(distDir, "spherical", spherical);
+        // envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilterFixUp);
+        // envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
+        // envUtils::writeImage_luv(distDir, "equirectangular", equirectangular);
 
         envUtils::freeCubemapMipMap(cmPrefilterFixUp);
         envUtils::freeCubemapMipMap(cmPrefilter);

@@ -214,9 +214,11 @@ int writeImage_luv(const char* dir, const char* filename, const Image& image)
     return 0;
 }
 
-int writeImage_ldr(const char* filename, const Image& image)
+int writeImage_ldr(const char* dir, const char* filename, const Image& image)
 {
-    printf("writing %s file\n", filename);
+    Path path;
+    createPath(path, dir, filename);
+    printf("writing %s file\n", path);
     uint8_t* dest = new uint8_t[image.width * image.height * 3];
 
     for (int y = 0; y < image.height; y++)
@@ -229,19 +231,18 @@ int writeImage_ldr(const char* filename, const Image& image)
             tonemap(pixelDst, pixelSrc.ptr());
         }
     }
-    int ret = stbi_write_jpg(filename, image.width, image.height, 3, dest, 92);
+    int ret = stbi_write_jpg(path, image.width, image.height, 3, dest, 92);
 
     delete[] dest;
     return ret;
 }
 
-int writeThumbnail(const char* dir, const char* basename, const Image& image, int width, int height)
+void createThumbnail(Image& dst, const Image& image, int width, int height)
 {
     auto t = logStart("createThumbnail");
 
-    Image thumbnail;
     Image thumbnailTmp;
-    envUtils::createImage(thumbnail, width, height);
+    envUtils::createImage(dst, width, height);
     envUtils::createImage(thumbnailTmp, width, image.height);
 
     int scaleX = image.width / width;
@@ -270,7 +271,7 @@ int writeThumbnail(const char* dir, const char* basename, const Image& image, in
     {
         for (int y = 0; y < height; y++)
         {
-            float3& pixel = thumbnail.getPixel(x, y);
+            float3& pixel = dst.getPixel(x, y);
             float* src = thumbnailTmp.getPixel(x, y * scaleY).ptr();
             for (int s = 0; s < scaleY; s++)
             {
@@ -286,13 +287,7 @@ int writeThumbnail(const char* dir, const char* basename, const Image& image, in
 
     logEnd(t);
 
-    Path file;
-    snprintf(file, 1023, "%s/%s.jpg", dir, basename);
-    envUtils::writeImage_ldr(file, thumbnail);
-
-    envUtils::freeImage(thumbnail);
     envUtils::freeImage(thumbnailTmp);
-    return 0;
 }
 
 int loadImage(Image& image, const char* filename)
@@ -465,11 +460,9 @@ static void writeCubemap_luv_internal(FILE* fp, uint8_t* tempBuffer, const Cubem
     }
 }
 
-int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm)
+int writeCubemap_luv(const char* dir, const char* filename, const Cubemap& cm)
 {
     Path path;
-    char filename[511];
-    snprintf(filename, 511, "%s.luv", basename);
     createPath(path, dir, filename);
 
     printf("writing %s file\n", path);
@@ -492,11 +485,9 @@ int writeCubemap_luv(const char* dir, const char* basename, const Cubemap& cm)
     return 0;
 }
 
-int writeCubemapMipMap_luv(const char* dir, const char* basename, const CubemapMipMap& cmMipMap)
+int writeCubemapMipMap_luv(const char* dir, const char* filename, const CubemapMipMap& cmMipMap)
 {
     Path path;
-    char filename[511];
-    snprintf(filename, 511, "%s.luv", basename);
     createPath(path, dir, filename);
 
     printf("writing %s file\n", path);

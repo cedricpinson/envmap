@@ -32,11 +32,13 @@ void freeCubemapMipMap(CubemapMipMap& cmMipMap);
 // image
 int loadImage(Image& image, const char* filename);
 int writeImage_hdr(const char* dir, const char* filename, const Image& image);
+int writeImage_ldr(const char* dir, const char* filename, const Image& image);
 int writeImage_luv(const char* dir, const char* filename, const Image& image);
 void createImage(Image& image, int width, int height);
 void freeImage(Image& image);
 void clampImage(Image& src, float maxValue = 255);
 int writeThumbnail(const char* dir, const char* basename, const Image& image, int width, int height);
+void createThumbnail(Image& dst, const Image& image, int width, int height);
 
 // spherical harmonics coefficient
 void computeSphericalHarmonicsFromCubemap(double* spherical, const Cubemap& cm);

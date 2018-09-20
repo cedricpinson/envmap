@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Cubemap.h"
 
 const size_t CubemapPrefilterMaxLevel = 16;
