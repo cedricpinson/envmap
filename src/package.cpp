@@ -1,5 +1,9 @@
 #include "package.h"
-#include "envUtils.h"
+#include "Cubemap.h"
+#include "CubemapMipMap.h"
+#include "Image.h"
+#include "io.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -83,6 +87,51 @@ int printImage(char* buffer, const ImageDescription& image)
     return size;
 }
 
+void writeCubemapMipMap(const char* filename, const CubemapMipMap& cm, ImageEncoding encoding)
+{
+    switch (encoding)
+    {
+    case ImageEncoding::luv:
+        io::writeCubemapMipMap_luv(filename, cm);
+        break;
+    case ImageEncoding::rgbm:
+        //        io::writeCubemapMipMap_rgbm(filename, cm);
+        break;
+    default:
+        break;
+    }
+}
+
+void writeCubemap(const char* filename, const Cubemap& cm, ImageEncoding encoding)
+{
+    switch (encoding)
+    {
+    case ImageEncoding::luv:
+        io::writeCubemap_luv(filename, cm);
+        break;
+    case ImageEncoding::rgbm:
+        //        io::writeCubemap_rgbm(filename, cm);
+        break;
+    default:
+        break;
+    }
+}
+
+void writeImage(const char* filename, const Image& image, ImageEncoding encoding)
+{
+    switch (encoding)
+    {
+    case ImageEncoding::luv:
+        io::writeImage_luv(filename, image);
+        break;
+    case ImageEncoding::rgbm:
+        //        io::writeImage_rgbm(filename, image);
+        break;
+    default:
+        break;
+    }
+}
+
 void Package::addPrefilterCubemap(const CubemapMipMap& cm, ImageEncoding encoding)
 {
     Path filename;
@@ -90,12 +139,10 @@ void Package::addPrefilterCubemap(const CubemapMipMap& cm, ImageEncoding encodin
 
     ImageDescription& imageDescription = images[numImages++];
 
-    if (encoding == ImageEncoding::luv)
-    {
-        envUtils::writeCubemapMipMap_luv(distDir, filename, cm);
-    }
     Path path;
     createPath(path, distDir, filename);
+
+    writeCubemapMipMap(path, cm, encoding);
 
     int sizeUncompressed = getFileSize(path);
     int sizeCompressed = 0;
@@ -123,13 +170,10 @@ void Package::addPrefilterEquirectangular(const Image& image, ImageEncoding enco
 
     ImageDescription& imageDescription = images[numImages++];
 
-    if (encoding == ImageEncoding::luv)
-    {
-        envUtils::writeImage_luv(distDir, filename, image);
-    }
-
     Path path;
     createPath(path, distDir, filename);
+
+    writeImage(path, image, encoding);
 
     int sizeUncompressed = getFileSize(path);
     int sizeCompressed = 0;
@@ -161,7 +205,7 @@ void Package::addThumbnail(const Image& image)
 
     ImageDescription& imageDescription = images[numImages++];
 
-    envUtils::writeImage_ldr(distDir, filename, image);
+    io::writeImage_ldr(path, image);
 
     int sizeUncompressed = getFileSize(path);
     memcpy(imageDescription.filename, filename, sizeof(filename));
@@ -181,13 +225,10 @@ void Package::addBackground(const Cubemap& cm, ImageEncoding encoding)
 
     ImageDescription& imageDescription = images[numImages++];
 
-    if (encoding == ImageEncoding::luv)
-    {
-        envUtils::writeCubemap_luv(distDir, filename, cm);
-    }
-
     Path path;
     createPath(path, distDir, filename);
+
+    writeCubemap(path, cm, encoding);
 
     int sizeUncompressed = getFileSize(path);
     int sizeCompressed = 0;
@@ -259,7 +300,8 @@ void Package::write()
     size += sprintf(config + size, "\n  ]\n");
     size += sprintf(config + size, "}\n");
 
-    printf("%s", config);
+    printf("%s\n", config);
+    printf("size %d\n", size);
 
     delete[] config;
 }

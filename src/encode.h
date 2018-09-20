@@ -1,6 +1,5 @@
 #pragma once
 
-#include "float3.h"
 #include <stdint.h>
 
 void encodeLUV(uint8_t* luvDst, const float* rgbSrc);

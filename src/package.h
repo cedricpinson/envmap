@@ -2,8 +2,10 @@
 
 #include "utils.h"
 #include "Spherical.h"
-#include "CubemapMipMap.h"
-#include "Image.h"
+
+struct CubemapMipMap;
+struct Cubemap;
+struct Image;
 
 namespace pkg {
 

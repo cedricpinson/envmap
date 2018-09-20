@@ -1,6 +1,7 @@
 #include "envUtils.h"
 #include "log.h"
 #include "threadLines.h"
+#include "Cubemap.h"
 
 namespace envUtils {
 

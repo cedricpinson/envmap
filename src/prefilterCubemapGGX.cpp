@@ -2,6 +2,7 @@
 #include "threadLines.h"
 
 #include "Cubemap.h"
+#include "CubemapMipMap.h"
 #include "envUtils.h"
 #include "utils.h"
 #include <stddef.h>

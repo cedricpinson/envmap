@@ -1,9 +1,11 @@
 #include "Cubemap.h"
+#include "CubemapMipMap.h"
 #include "Image.h"
 #include "Spherical.h"
 #include "envUtils.h"
-#include "utils.h"
+#include "io.h"
 #include "package.h"
+#include "utils.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <thread>
@@ -27,19 +29,19 @@ struct Options
 void printUsage()
 {
     const char* text =
-        "envmap is a tool to precompute environment for PBR rendering "
-        "usages:"
-        " envmap [options] panorama_env.hdr"
-        ""
-        "example"
-        " envmap -s 512 -n 4096 panorama_env.hdr"
-        ""
-        "Options:"
-        " -s [--ibl-size] to define the cubemap resolution computed, default 256"
-        " -n [--ibl-sample] number of sample to compute a texel, default 1024"
-        " -t [--thumbnail-size] width size of generated thumbnail, default 256, it will generate 256x128 thumbnail"
-        " -d a debug flag to write intermediate texture"
-        " -m [--no-threads] no multithreading, default is false";
+        "envmap is a tool to precompute environment for PBR rendering\n"
+        "usages:\n"
+        " envmap [options] panorama_env.hdr\n"
+        "\n"
+        "example\n"
+        " envmap -s 512 -n 4096 panorama_env.hdr\n"
+        "\n"
+        "Options:\n"
+        " -s [--ibl-size] to define the cubemap resolution computed, default 256\n"
+        " -n [--ibl-sample] number of sample to compute a texel, default 1024\n"
+        " -t [--thumbnail-size] width size of generated thumbnail, default 256, it will generate 256x128 thumbnail\n"
+        " -d a debug flag to write intermediate texture\n"
+        " -m [--no-threads] no multithreading, default is false\n";
 
     printf("%s", text);
 }
@@ -113,8 +115,9 @@ int main(int argc, char** argv)
 
     Image image;
     const char* distDir = options.distDir;
+    Path path;
 
-    int loadImageResult = envUtils::loadImage(image, options.inputFilename);
+    int loadImageResult = io::loadImage(image, options.inputFilename);
     if (loadImageResult == 0)
     {
 
@@ -136,13 +139,15 @@ int main(int argc, char** argv)
         envUtils::equirectangularToCubemap(cm, image, options.nbThreads);
 
         if (options.debug)
-            envUtils::writeCubemap_hdr(distDir, "input", cm);
+        {
+            io::writeCubemapDebug(distDir, "input", cm);
+        }
 
         CubemapMipMap cmMipMap;
         envUtils::createCubemapMipMap(cmMipMap, cm);
 
         if (options.debug)
-            envUtils::writeCubemapMipMapFaces_hdr(distDir, "mipmap", cmMipMap);
+            io::writeCubemapMipMapDebug(distDir, "mipmap", cmMipMap);
 
         CubemapMipMap cmPrefilter;
         envUtils::prefilterCubemapGGX(cmPrefilter, cmMipMap, options.numSamples, options.nbThreads);
@@ -151,14 +156,16 @@ int main(int argc, char** argv)
         envUtils::packPrefilterCubemapToEquilateral(equirectangular, cmPrefilter, options.nbThreads);
         if (options.debug)
         {
-            envUtils::writeImage_hdr(distDir, "equirectangular", equirectangular);
+            createPath(path, distDir, "equirectangular.hdr");
+            io::writeImage_hdr(path, equirectangular);
         }
 
         CubemapMipMap cmPrefilterFixUp;
         envUtils::resampleCubemap(cmPrefilterFixUp, cmPrefilter, options.nbThreads);
 
-        if (options.debug)
-            envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter", cmPrefilter);
+        if (options.debug) {
+            io::writeCubemapMipMapDebug(distDir, "prefilter", cmPrefilter);
+        }
 
         Spherical spherical;
         envUtils::computeSphericalHarmonicsFromCubemap(spherical, cm);
@@ -166,8 +173,8 @@ int main(int argc, char** argv)
         if (options.debug)
         {
             CubemapMipMap cmDecode;
-            envUtils::readCubemapMipMap_luv(cmDecode, "test/prefilter.luv");
-            envUtils::writeCubemapMipMapFaces_hdr(distDir, "prefilter-decode", cmDecode);
+            io::readCubemapMipMap_luv(cmDecode, "test/prefilter.luv");
+            io::writeCubemapMipMapDebug(distDir, "prefilter-decode", cmDecode);
             envUtils::freeCubemapMipMap(cmDecode);
         }
 
@@ -178,6 +185,8 @@ int main(int argc, char** argv)
         package.addPrefilterCubemap(cmPrefilterFixUp, pkg::ImageEncoding::luv);
         package.addPrefilterEquirectangular(equirectangular, pkg::ImageEncoding::luv);
         package.addBackground(cmPrefilter.levels[2], pkg::ImageEncoding::luv);
+        package.addBackground(cmPrefilter.levels[0], pkg::ImageEncoding::luv);
+        package.addBackground(cmPrefilter.levels[4], pkg::ImageEncoding::luv);
 
         package.write();
 

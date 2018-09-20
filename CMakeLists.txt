@@ -14,6 +14,7 @@ add_executable(envmap src/envmap.cpp src/envUtils.cpp
   src/prefilterCubemapGGX.cpp
   src/package.cpp
   src/utils.cpp
+  src/io.cpp
   src/log.cpp
   src/encode.cpp
   src/Image.cpp src/Cubemap.cpp )

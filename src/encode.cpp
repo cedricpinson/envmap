@@ -1,4 +1,5 @@
 #include "encode.h"
+#include "float3.h"
 
 // http://graphicrants.blogspot.fr/2009/04/rgbm-color-encoding.html
 // M matrix, for encoding

@@ -1,6 +1,5 @@
 #pragma once
 #include "float3.h"
-#include <math.h>
 
 // Image is supposed to be 3 rgb float value
 struct Image
