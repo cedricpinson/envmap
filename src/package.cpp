@@ -87,6 +87,20 @@ int printImage(char* buffer, const ImageDescription& image)
     return size;
 }
 
+int printSpherical(char* buffer, Spherical& spherical)
+{
+    int size = 0;
+
+    size += sprintf(buffer + size, "    \"diffuseSPH\": [ %f, %f, %f", spherical[0], spherical[1], spherical[2]);
+    for (int i = 1; i < NUM_SH_COEFFICIENT; ++i)
+    {
+        size += sprintf(buffer + size, ", %f, %f,%f", spherical[i * 3], spherical[i * 3 + 1], spherical[i * 3 + 2]);
+    }
+    size += sprintf(buffer + size, " ],\n");
+
+    return size;
+}
+
 void writeCubemapMipMap(const char* filename, const CubemapMipMap& cm, ImageEncoding encoding)
 {
     switch (encoding)
@@ -95,7 +109,7 @@ void writeCubemapMipMap(const char* filename, const CubemapMipMap& cm, ImageEnco
         io::writeCubemapMipMap_luv(filename, cm);
         break;
     case ImageEncoding::rgbm:
-        //        io::writeCubemapMipMap_rgbm(filename, cm);
+        io::writeCubemapMipMap_rgbm(filename, cm);
         break;
     default:
         break;
@@ -110,7 +124,7 @@ void writeCubemap(const char* filename, const Cubemap& cm, ImageEncoding encodin
         io::writeCubemap_luv(filename, cm);
         break;
     case ImageEncoding::rgbm:
-        //        io::writeCubemap_rgbm(filename, cm);
+        io::writeCubemap_rgbm(filename, cm);
         break;
     default:
         break;
@@ -125,7 +139,7 @@ void writeImage(const char* filename, const Image& image, ImageEncoding encoding
         io::writeImage_luv(filename, image);
         break;
     case ImageEncoding::rgbm:
-        //        io::writeImage_rgbm(filename, image);
+        io::writeImage_rgbm(filename, image);
         break;
     default:
         break;
@@ -152,6 +166,8 @@ void Package::addPrefilterCubemap(const CubemapMipMap& cm, ImageEncoding encodin
     if (needCompression)
     {
         sizeCompressed = compressGZ(path);
+        if (sizeCompressed)
+            remove(path);
         strcat(imageDescription.filename, ".gz");
     }
 
@@ -183,6 +199,8 @@ void Package::addPrefilterEquirectangular(const Image& image, ImageEncoding enco
     if (needCompression)
     {
         sizeCompressed = compressGZ(path);
+        if (sizeCompressed)
+            remove(path);
         strcat(imageDescription.filename, ".gz");
     }
 
@@ -238,6 +256,8 @@ void Package::addBackground(const Cubemap& cm, ImageEncoding encoding)
     if (needCompression)
     {
         sizeCompressed = compressGZ(path);
+        if (sizeCompressed)
+            remove(path);
         strcat(imageDescription.filename, ".gz");
     }
 
@@ -249,6 +269,11 @@ void Package::addBackground(const Cubemap& cm, ImageEncoding encoding)
     imageDescription.sizeCompressed = sizeCompressed;
 }
 
+void Package::setSpherical(Spherical* sph)
+{
+    diffuseSPH = sph;
+}
+
 void Package::write()
 {
 
@@ -257,6 +282,7 @@ void Package::write()
 
     int size = 0;
     size += sprintf(config, "{\n  \"version\": %d,\n", version);
+    size += printSpherical(config + size, *diffuseSPH);
     size += sprintf(config + size, "  \"textures\": [\n");
 
     bool firstImage = true;

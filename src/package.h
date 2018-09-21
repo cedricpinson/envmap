@@ -38,21 +38,12 @@ struct Package
 
     Package(const char* distDir) : distDir(distDir) {}
 
-    void setSph(Spherical* sph) { diffuseSPH = sph; }
+    void setSpherical(Spherical* sph);
 
-    // il faut ecrire directement et garder les infos filename ...
     void addPrefilterCubemap(const CubemapMipMap& cm, ImageEncoding encoding);
     void addPrefilterEquirectangular(const Image& img, ImageEncoding encoding);
     void addThumbnail(const Image& img);
     void addBackground(const Cubemap& cm, ImageEncoding encoding);
-    // void addBackgroundCubemap(Cubemap* cm, const char* encoding)
-    // {
-    //     ImageDescription& image = images[numImages++];
-    //     image.type = "background";
-    //     image.encoding = encoding;
-    //     image.format = "cubemap";
-    //     image.width = image.height = cm.size;
-    // }
 
     // void setLUT(Image* img)
     // {

@@ -180,13 +180,19 @@ int main(int argc, char** argv)
 
         pkg::Package package(distDir);
 
-        package.setSph(&spherical);
+        package.setSpherical(&spherical);
         package.addThumbnail(thumbnail);
         package.addPrefilterCubemap(cmPrefilterFixUp, pkg::ImageEncoding::luv);
         package.addPrefilterEquirectangular(equirectangular, pkg::ImageEncoding::luv);
         package.addBackground(cmPrefilter.levels[2], pkg::ImageEncoding::luv);
         package.addBackground(cmPrefilter.levels[0], pkg::ImageEncoding::luv);
         package.addBackground(cmPrefilter.levels[4], pkg::ImageEncoding::luv);
+
+        package.addPrefilterCubemap(cmPrefilterFixUp, pkg::ImageEncoding::rgbm);
+        package.addPrefilterEquirectangular(equirectangular, pkg::ImageEncoding::rgbm);
+        package.addBackground(cmPrefilter.levels[2], pkg::ImageEncoding::rgbm);
+        package.addBackground(cmPrefilter.levels[0], pkg::ImageEncoding::rgbm);
+        package.addBackground(cmPrefilter.levels[4], pkg::ImageEncoding::rgbm);
 
         package.write();
 

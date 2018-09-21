@@ -114,10 +114,8 @@ void decodeLUV(float* rgb, const uint8_t* luv)
 
 static float RGBMMaxRange = 8.0;
 
-// https://gist.github.com/aras-p/1199797
-void encodeRGBM(float rgb[3], uint8_t rgbm[4])
+void encodeRGBM(uint8_t* rgbm, const float* rgb)
 {
-
     // in our case,
     const float kRGBMMaxRange = RGBMMaxRange;
     const float kOneOverRGBMMaxRange = 1.0f / kRGBMMaxRange;
@@ -128,16 +126,16 @@ void encodeRGBM(float rgb[3], uint8_t rgbm[4])
     float g = rgb[1] * kOneOverRGBMMaxRange;
     float b = rgb[2] * kOneOverRGBMMaxRange;
 
-    float a = fmax(fmax(r, g), fmax(b, 1e-6f));
+    float a = fmaxf(fmax(r, g), fmaxf(b, 1e-6f));
     a = ceilf(a * 255.0f) / 255.0f;
 
-    rgbm[0] = uint8_t(fmin(r / a, 1.0f) * 255);
-    rgbm[1] = uint8_t(fmin(g / a, 1.0f) * 255);
-    rgbm[2] = uint8_t(fmin(b / a, 1.0f) * 255);
-    rgbm[3] = uint8_t(fmin(a, 1.0f) * 255);
+    rgbm[0] = uint8_t(fminf(r / a, 1.0f) * 255);
+    rgbm[1] = uint8_t(fminf(g / a, 1.0f) * 255);
+    rgbm[2] = uint8_t(fminf(b / a, 1.0f) * 255);
+    rgbm[3] = uint8_t(fminf(a, 1.0f) * 255);
 }
 
-void decodeRGBM(uint8_t rgbm[4], float rgb[3])
+void decodeRGBM(float* rgb, const uint8_t* rgbm)
 {
     rgb[0] = rgbm[0] / 255.0f * RGBMMaxRange * rgbm[3] / 255.0f;
     rgb[1] = rgbm[1] / 255.0f * RGBMMaxRange * rgbm[3] / 255.0f;

@@ -42,11 +42,9 @@ const char* getCubemapFaceName(Cubemap::Face face)
     return "NONE";
 }
 
-int writeSpherical_json(const char* dir, const char* basename, double* spherical)
+int writeSpherical_json(const char* path, double* spherical)
 {
-    Path outputFilename;
-    snprintf(outputFilename, 255, "%s/%s.json", dir, basename);
-    printf("writing file %s\n", outputFilename);
+    printf("writing file %s\n", path);
 
     const size_t BufferSize = 4096;
     char outputBuffer[BufferSize + 1];
@@ -85,15 +83,15 @@ int writeSpherical_json(const char* dir, const char* basename, double* spherical
     count += snprintf(&outputBuffer[count], BufferSize - count, "}\n");
 
     printf("%s\n", outputBuffer);
-    FILE* fp = fopen(outputFilename, "w");
+    FILE* fp = fopen(path, "w");
     if (!fp)
     {
-        printf("can't write file %s", outputFilename);
+        printf("can't write file %s", path);
         return 1;
     }
     if (fprintf(fp, "%s", outputBuffer) < 0)
     {
-        printf("error writing file %s", outputFilename);
+        printf("error writing file %s", path);
         return 1;
     }
     fclose(fp);
@@ -189,6 +187,35 @@ int writeImage_luv(const char* path, const Image& image)
             dest[y * w + x + (w * h * 1)] = rgba8[1];
             dest[y * w + x + (w * h * 2)] = rgba8[2];
             dest[y * w + x + (w * h * 3)] = rgba8[3];
+        }
+    }
+
+    fwrite(dest, w * h * 4, 1, fp);
+    delete[] dest;
+    return 0;
+}
+
+int writeImage_rgbm(const char* path, const Image& image)
+{
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    printf("writing %s file\n", path);
+
+    int w = image.width;
+    int h = image.height;
+    uint8_t* dest = new uint8_t[w * h * 4];
+    for (int y = 0; y < image.height; y++)
+    {
+        const float3* lineSrc = &image.getPixel(0, y);
+        uint8_t* lineDst = &dest[y * w * 4];
+        for (int x = 0; x < image.width; x++, lineDst += 4)
+        {
+            encodeRGBM(lineDst, lineSrc[x].ptr());
         }
     }
 
@@ -332,6 +359,71 @@ int writeCubemap_luv(const char* path, const Cubemap& cm)
 
     writeCubemap_luv_internal(fp, dest, cm);
 
+    fclose(fp);
+    delete[] dest;
+    return 0;
+}
+
+static void writeCubemap_rgbm_internal(FILE* fp, uint8_t* tempBuffer, const Cubemap& cm)
+{
+    uint8_t* dest = tempBuffer;
+    int size = cm.size;
+    for (int i = 0; i < 6; i++)
+    {
+        for (int y = 0; y < size; y++)
+        {
+            const float3* lineSrc = &cm.faces[i].getPixel(0, y);
+            for (int x = 0; x < size; x++)
+            {
+                encodeRGBM(&dest[(y * size + x) * 4], lineSrc[x].ptr());
+            }
+        }
+        fwrite(dest, size * size * 4, 1, fp);
+    }
+}
+
+int writeCubemap_rgbm(const char* path, const Cubemap& cm)
+{
+    printf("writing %s file\n", path);
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    // allocate only one face
+    int maxSize = cm.size;
+    uint8_t* dest = new uint8_t[maxSize * maxSize * 4];
+
+    writeCubemap_rgbm_internal(fp, dest, cm);
+
+    fclose(fp);
+    delete[] dest;
+    return 0;
+}
+
+int writeCubemapMipMap_rgbm(const char* path, const CubemapMipMap& cmMipMap)
+{
+    printf("writing %s file\n", path);
+
+    FILE* fp = fopen(path, "wb");
+    if (!fp)
+    {
+        printf("can't write file %s", path);
+        return 1;
+    }
+
+    // allocate only one face
+    int maxSize = cmMipMap.levels[0].size;
+    uint8_t* dest = new uint8_t[maxSize * maxSize * 4];
+
+    for (int mipLevel = 0; mipLevel < cmMipMap.numLevel; mipLevel++)
+    {
+        const Cubemap& cm = cmMipMap.levels[mipLevel];
+        writeCubemap_rgbm_internal(fp, dest, cm);
+    }
     fclose(fp);
     delete[] dest;
     return 0;
