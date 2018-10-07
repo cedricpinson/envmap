@@ -29,7 +29,7 @@ void freeCubemapMipMap(CubemapMipMap& cmMipMap);
 void createImage(Image& image, int width, int height);
 void freeImage(Image& image);
 void clampImage(Image& src, float maxValue = 255);
-void createThumbnail(Image& dst, const Image& image, int width, int height);
+void resizeImage(Image& dst, const Image& image, int width, int height);
 
 // spherical harmonics coefficient
 void computeSphericalHarmonicsFromCubemap(double* spherical, const Cubemap& cm);

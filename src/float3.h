@@ -280,7 +280,10 @@ template <typename T> struct Vec3Type
     inline const Vec3Type operator-() const { return Vec3Type(-_v[0], -_v[1], -_v[2]); }
 
     /** Length of the vector = sqrt( vec . vec ) */
-    inline value_type length() const { return sqrtf(_v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2]); }
+    inline value_type length() const
+    {
+        return static_cast<value_type>(sqrtf(_v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2]));
+    }
 
     /** Length squared of the vector = vec . vec */
     inline value_type length2() const { return _v[0] * _v[0] + _v[1] * _v[1] + _v[2] * _v[2]; }
@@ -293,7 +296,7 @@ template <typename T> struct Vec3Type
         value_type norm = Vec3Type::length();
         if (norm > 0.0)
         {
-            value_type inv = 1.0f / norm;
+            value_type inv = static_cast<value_type>(1.0) / norm;
             _v[0] *= inv;
             _v[1] *= inv;
             _v[2] *= inv;
@@ -493,9 +496,40 @@ template <typename T> inline void normalize(T* result, const T* a)
     result[1] = a[1] * l;
     result[2] = a[2] * l;
 }
+
+template <typename T> inline T mult(T a, T b)
+{
+    T result;
+    result[0] = a[0] * b[0];
+    result[1] = a[1] * b[1];
+    result[2] = a[2] * b[2];
+    return result;
+}
+
 inline void float3ToDouble3(double* result, const float* a)
 {
     result[0] = (double)a[0];
     result[1] = (double)a[1];
     result[2] = (double)a[2];
+}
+
+// rgb to luminance
+template <typename T> double luminance(T color) { return color[0] * 0.2125 + color[1] * 0.7154 + color[2] * 0.0721; }
+
+template <typename T> inline T max(T a, T b)
+{
+    T result;
+    result[0] = a[0] < b[0] ? b[0] : a[0];
+    result[1] = a[1] < b[1] ? b[1] : a[1];
+    result[2] = a[2] < b[2] ? b[2] : a[2];
+    return result;
+}
+
+template <typename T> inline T min(T a, T b)
+{
+    T result;
+    result[0] = a[0] > b[0] ? b[0] : a[0];
+    result[1] = a[1] > b[1] ? b[1] : a[1];
+    result[2] = a[2] > b[2] ? b[2] : a[2];
+    return result;
 }

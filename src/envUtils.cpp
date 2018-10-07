@@ -9,6 +9,10 @@
 #include <math.h>
 #include <string.h>
 
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#define STBIR_DEFAULT_FILTER_DOWNSAMPLE STBIR_FILTER_CATMULLROM
+#include "stb/stb_image_resize.h"
+
 namespace envUtils {
 
 void free_image_exr(Image& image) { free(image.data); }
@@ -25,57 +29,13 @@ void createImage(Image& image, int width, int height)
     image.type = Image::RAW;
 }
 
-void createThumbnail(Image& dst, const Image& image, int width, int height)
+void resizeImage(Image& dst, const Image& image, int width, int height)
 {
-    auto t = logStart("createThumbnail");
+    auto t = logStart("resizeImage");
 
-    Image thumbnailTmp;
     envUtils::createImage(dst, width, height);
-    envUtils::createImage(thumbnailTmp, width, image.height);
-
-    int scaleX = image.width / width;
-    float invScaleX = 1.0 / scaleX;
-    for (int y = 0; y < image.height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            float3& pixel = thumbnailTmp.getPixel(x, y);
-            const float* src = image.getPixel(x * scaleX, y).ptr();
-            for (int s = 0; s < scaleX; s++)
-            {
-                pixel[0] += src[s * 3 + 0];
-                pixel[1] += src[s * 3 + 1];
-                pixel[2] += src[s * 3 + 2];
-            }
-            pixel[0] *= invScaleX;
-            pixel[1] *= invScaleX;
-            pixel[2] *= invScaleX;
-        }
-    }
-
-    int scaleY = image.height / height;
-    float invScaleY = 1.0 / scaleY;
-    for (int x = 0; x < width; x++)
-    {
-        for (int y = 0; y < height; y++)
-        {
-            float3& pixel = dst.getPixel(x, y);
-            float* src = thumbnailTmp.getPixel(x, y * scaleY).ptr();
-            for (int s = 0; s < scaleY; s++)
-            {
-                pixel[0] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 0];
-                pixel[1] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 1];
-                pixel[2] += src[(s * thumbnailTmp.rowInFloat3) * 3 + 2];
-            }
-            pixel[0] *= invScaleY;
-            pixel[1] *= invScaleY;
-            pixel[2] *= invScaleY;
-        }
-    }
-
+    stbir_resize_float(image.getData(), image.width, image.height, 0, dst.getData(), width, height, 0, 3);
     logEnd(t);
-
-    envUtils::freeImage(thumbnailTmp);
 }
 
 void freeImage(Image& image)

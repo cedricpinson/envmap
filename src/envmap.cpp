@@ -1,9 +1,11 @@
 #include "Cubemap.h"
 #include "CubemapMipMap.h"
 #include "Image.h"
+#include "Light.h"
 #include "Spherical.h"
 #include "envUtils.h"
 #include "io.h"
+#include "lightExtraction.h"
 #include "package.h"
 #include "utils.h"
 #include <getopt.h>
@@ -134,7 +136,7 @@ int main(int argc, char** argv)
         envUtils::clampImage(image, 255);
 
         Image thumbnail;
-        envUtils::createThumbnail(thumbnail, image, options.thumbnailSize, options.thumbnailSize / 2);
+        envUtils::resizeImage(thumbnail, image, options.thumbnailSize, options.thumbnailSize / 2);
 
         envUtils::equirectangularToCubemap(cm, image, options.nbThreads);
 
@@ -163,7 +165,8 @@ int main(int argc, char** argv)
         CubemapMipMap cmPrefilterFixUp;
         envUtils::resampleCubemap(cmPrefilterFixUp, cmPrefilter, options.nbThreads);
 
-        if (options.debug) {
+        if (options.debug)
+        {
             io::writeCubemapMipMapDebug(distDir, "prefilter", cmPrefilter);
         }
 
@@ -177,6 +180,17 @@ int main(int argc, char** argv)
             io::writeCubemapMipMapDebug(distDir, "prefilter-decode", cmDecode);
             envUtils::freeCubemapMipMap(cmDecode);
         }
+
+        Light light;
+        Image inputLightExtraction;
+        // io::loadImage(inputLightExtraction, "extraction_input.exr");
+        envUtils::resizeImage(inputLightExtraction, image, 1024, 512);
+        io::writeImage_hdr("extraction_input-0.hdr", inputLightExtraction);
+        if (extractMainLight(light, inputLightExtraction) != 0)
+        {
+            printf("Did not find a main light from the environment\n");
+        }
+        envUtils::freeImage(inputLightExtraction);
 
         pkg::Package package(distDir);
 
@@ -196,16 +210,11 @@ int main(int argc, char** argv)
 
         package.write();
 
-        // envUtils::writeThumbnail(distDir, "thumbnail", image, options.thumbnailSize, options.thumbnailSize / 2);
-        // envUtils::writeSpherical_json(distDir, "spherical", spherical);
-        // envUtils::writeCubemapMipMap_luv(distDir, "prefilter", cmPrefilterFixUp);
-        // envUtils::writeCubemap_luv(distDir, "background", cmPrefilter.levels[2]);
-        // envUtils::writeImage_luv(distDir, "equirectangular", equirectangular);
-
         envUtils::freeCubemapMipMap(cmPrefilterFixUp);
         envUtils::freeCubemapMipMap(cmPrefilter);
         envUtils::freeCubemapMipMap(cmMipMap);
         envUtils::freeImage(equirectangular);
+        envUtils::freeImage(thumbnail);
         envUtils::freeImage(image);
         envUtils::freeCubemap(cm);
     }
