@@ -23,6 +23,12 @@ target_link_libraries(envmap pthread)
 target_compile_options(envmap PRIVATE -Wall -Wextra -pedantic -Werror -Wdouble-promotion -Wmissing-variable-declarations -Wfloat-conversion -Wpadded -g)
 
 install(TARGETS envmap
-RUNTIME DESTINATION bin
+  RUNTIME DESTINATION bin
 )
 
+add_custom_target(check)
+
+add_custom_command( TARGET check
+  POST_BUILD
+  COMMAND ${PROJECT_SOURCE_DIR}/check-diff.sh ${PROJECT_SOURCE_DIR}/src
+)
