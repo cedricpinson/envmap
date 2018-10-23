@@ -34,7 +34,7 @@ struct Cubemap
     void getDirectionFor(float* direction, Face face, int x, int y) const;
     void getDirectionFor(float* direction, Face face, float x, float y) const;
 
-    void getDirectionFixUpFor(float* direction, Face face, float x, float y) const;
+    void getDirectionFixUpFor(float* direction, Face face, int x, int y) const;
 
     void setAllFacesFromCross(const Image& image);
 
@@ -119,8 +119,14 @@ inline void Cubemap::_remapUV(float& cx, float& cy, float x, float y) const
 
 inline void Cubemap::_remapFixUpUV(float& cx, float& cy, float x, float y) const
 {
-    const float scale = 2.0f / (size - 1.0f);
+    if (size == 1)
+    {
+        cx = 0.0f;
+        cy = 0.0f;
+        return;
+    }
     // transform from [0..res - 1] to [-1 .. 1], match up edges exactly.
+    float scale = 2.0f / (size - 1.0f);
     cx = (x * scale) - 1;
     cy = 1 - (y * scale);
 }
@@ -174,9 +180,9 @@ inline void Cubemap::getDirectionFor(float* direction, Face face, float x, float
     _getDirectionFor(direction, face, cx, cy);
 }
 
-inline void Cubemap::getDirectionFixUpFor(float* direction, Face face, float x, float y) const
+inline void Cubemap::getDirectionFixUpFor(float* direction, Face face, int x, int y) const
 {
     float cx, cy;
-    _remapFixUpUV(cx, cy, x, y);
+    _remapFixUpUV(cx, cy, (float)x, (float)y);
     _getDirectionFor(direction, face, cx, cy);
 }

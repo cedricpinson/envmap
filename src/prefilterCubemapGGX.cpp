@@ -209,10 +209,10 @@ void getTrilinear(float* color, const Cubemap& cubemap0, const Cubemap& cubemap1
     const Image& lod0 = cubemap0.faces[address.face];
     const Image& lod1 = cubemap1.faces[address.face];
 
-    float x0 = address.s * lod0.width;
-    float y0 = address.t * lod0.width;
-    float x1 = address.s * lod1.width;
-    float y1 = address.t * lod1.width;
+    float x0 = address.s * cubemap0.size;
+    float y0 = address.t * cubemap0.size;
+    float x1 = address.s * cubemap1.size;
+    float y1 = address.t * cubemap1.size;
 
     lod0.filterAt(color0, x0, y0);
     lod1.filterAt(color1, x1, y1);
@@ -407,6 +407,7 @@ struct ResampleContext
 // resample for seamless cubemap edge for webgl1 and more generally without extension seamless cubemap on gpu
 // https://seblagarde.wordpress.com/2012/06/10/amd-cubemapgen-for-physically-based-rendering/
 // http://code.google.com/p/nvidia-texture-tools/source/browse/trunk/src/nvtt/CubeSurface.cpp
+// The Stretch edge fixup method of ModifiedCubemapgen is based on NVTT implementation [8]
 void resampleCubemapRangeLines(ResampleContext context, int yStart, int yStop)
 {
     Cubemap& cubemapDest = *context.cubemapDest;
@@ -423,14 +424,14 @@ void resampleCubemapRangeLines(ResampleContext context, int yStart, int yStop)
     {
 
         float* line = cubemapDest.faces[faceIndex].getPixel(0, y).ptr();
-        for (int x = 0; x < size; x++)
+        for (int x = 0; x < cubemap.size; x++)
         {
             cubemap.getDirectionFixUpFor(direction, faceIndex, x, y);
             Cubemap::getAddressFor(address, direction);
 
             const Image& image = cubemap.faces[address.face];
-            x0 = address.s * image.width;
-            y0 = address.t * image.width;
+            x0 = address.s * size;
+            y0 = address.t * size;
 
             image.filterAt(color, x0, y0);
 

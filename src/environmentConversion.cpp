@@ -1,7 +1,7 @@
+#include "Cubemap.h"
 #include "envUtils.h"
 #include "log.h"
 #include "threadLines.h"
-#include "Cubemap.h"
 
 namespace envUtils {
 
@@ -26,8 +26,8 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
     Image& face = dst.faces[faceIdex];
     const Image& src = *context.src;
 
-    const size_t width = src.width;
-    const size_t height = src.height;
+    const int width = src.width;
+    const int height = src.height;
     const double r = width * 0.5 * M_1_PI;
     int dim = face.width;
 
@@ -73,7 +73,12 @@ void equirectangularToCubemapLines(EquirectangularProcessContext context, int st
                 yf = (yf + 1) * 0.5 * (height - 1);      // range [0, height[
                 // we can't use filterAt() here because it reads past the width/height
                 // which is okay for cubmaps but not for square images
-                const float3& pixel = src.getPixel((uint32_t)xf, (uint32_t)yf);
+
+                int xSample = (int)xf;
+                int ySample = (int)yf;
+                xSample = xSample < width ? xSample : width - 1;
+                ySample = ySample < height ? ySample : height - 1;
+                const float3& pixel = src.getPixel(xSample, ySample);
                 c[0] += (double)pixel[0];
                 c[1] += (double)pixel[1];
                 c[2] += (double)pixel[2];
@@ -129,13 +134,13 @@ void cubemapToEquirectangularLines(CubemapToEquirectangularProcessContext contex
 
     for (int y = startY; y <= stopY; y++)
     {
-        v = y * invHeight;
+        v = (y + 0.5f) * invHeight;
         theta = v * (float)M_PI;
 
         float* data = dst.getPixel(0, y).ptr();
         for (int x = 0; x < width; ++x, data += 3)
         {
-            u = x * invWidth;
+            u = (x + 0.5f) * invWidth;
             phi = u * PI_2;
 
             sinTheta = sinf(theta);
