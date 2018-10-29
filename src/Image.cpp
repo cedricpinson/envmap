@@ -11,6 +11,3 @@ void Image::subset(const Image& image, int x, int y, int w, int h)
     type = image.type;
     data = (float3*)&image.getPixel(x, y);
 }
-
-
-

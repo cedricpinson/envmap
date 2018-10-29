@@ -2,9 +2,9 @@
 
 #include <stdio.h>
 
-Clock logStart(const char * str)
+Clock logStart(const char* str)
 {
-    printf("%s",str);
+    printf("%s", str);
     auto start = std::chrono::steady_clock::now();
     return start;
 }

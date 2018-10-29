@@ -8,5 +8,4 @@ void decodeLUV(float* rgb, const uint8_t* luv);
 void encodeRGBM(uint8_t* rgbmDst, const float* rgbSrc);
 void decodeRGBM(float* rgb, const uint8_t* rgbm);
 
-
 void tonemap(uint8_t* rgbDst, const float* rgbSrc);

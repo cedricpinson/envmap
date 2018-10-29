@@ -1,7 +1,7 @@
 #pragma once
 
-#include "utils.h"
 #include "Spherical.h"
+#include "utils.h"
 
 struct CubemapMipMap;
 struct Cubemap;
@@ -36,7 +36,9 @@ struct Package
     int needCompression = true;
     int padding;
 
-    Package(const char* distDir) : distDir(distDir) {}
+    Package(const char* distDir)
+        : distDir(distDir)
+    {}
 
     void setSpherical(Spherical* sph);
 

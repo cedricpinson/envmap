@@ -269,10 +269,7 @@ void Package::addBackground(const Cubemap& cm, ImageEncoding encoding)
     imageDescription.sizeCompressed = sizeCompressed;
 }
 
-void Package::setSpherical(Spherical* sph)
-{
-    diffuseSPH = sph;
-}
+void Package::setSpherical(Spherical* sph) { diffuseSPH = sph; }
 
 void Package::write()
 {

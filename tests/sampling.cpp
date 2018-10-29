@@ -70,7 +70,6 @@ int main( // int argc, char** argv
         float y0 = address.t * textureSize;
         printf("fetch %f,%f\n", (double)x0, (double)y0);
 
-
         printf("\n");
     }
 
