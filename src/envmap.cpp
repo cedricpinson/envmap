@@ -183,18 +183,20 @@ int main(int argc, char** argv)
 
         Light light;
         Image inputLightExtraction;
-        // io::loadImage(inputLightExtraction, "extraction_input.exr");
+        bool hasLight = true;
         envUtils::resizeImage(inputLightExtraction, image, 1024, 512);
-        io::writeImage_hdr("extraction_input-0.hdr", inputLightExtraction);
         if (extractMainLight(light, inputLightExtraction) != 0)
         {
             printf("Did not find a main light from the environment\n");
+            hasLight = false;
         }
         envUtils::freeImage(inputLightExtraction);
 
         pkg::Package package(distDir);
 
         package.setSpherical(&spherical);
+        if (hasLight)
+            package.setMainLight(&light);
         package.addThumbnail(thumbnail);
         package.addPrefilterCubemap(cmPrefilterFixUp, pkg::ImageEncoding::luv);
         package.addPrefilterEquirectangular(equirectangular, pkg::ImageEncoding::luv);

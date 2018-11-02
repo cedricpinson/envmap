@@ -6,6 +6,7 @@
 struct CubemapMipMap;
 struct Cubemap;
 struct Image;
+struct Light;
 
 namespace pkg {
 
@@ -32,6 +33,7 @@ struct Package
     int numImages = 0;
     ImageDescription images[32];
     Spherical* diffuseSPH;
+    Light* light;
     const char* distDir;
     int needCompression = true;
     int padding;
@@ -46,6 +48,8 @@ struct Package
     void addPrefilterEquirectangular(const Image& img, ImageEncoding encoding);
     void addThumbnail(const Image& img);
     void addBackground(const Cubemap& cm, ImageEncoding encoding);
+
+    void setMainLight(Light* light);
 
     // void setLUT(Image* img)
     // {

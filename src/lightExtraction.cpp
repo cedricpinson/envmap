@@ -41,51 +41,6 @@ int lightCmpLumAverage(const void* a0, const void* b0)
     return 0;
 }
 
-double3 convertPositionToDirection(double2 position)
-{
-    double3 direction;
-    double x = position[0];
-    double y = position[1];
-
-    // https://www.shadertoy.com/view/4dsGD2
-    // Desmos math demonstration / check
-    // a,b,c => x,y,z direction axis
-    // https://www.desmos.com/calculator/2niuw1lpm5
-    double phi = (x * 2.0 * M_PI) - M_PI * 0.5;
-    double theta = (1.0 - y) * M_PI;
-
-    // Equation from http://graphicscodex.com  [sphry]
-    direction[0] = sin(theta) * cos(phi);
-    direction[1] = cos(theta);
-    direction[2] = sin(theta) * sin(phi);
-
-    // normalize direction
-    direction.normalize();
-    return direction;
-}
-
-void outputJSON(const Light& light)
-{
-    double x = light._centroidPosition[0];
-    double y = light._centroidPosition[1];
-    double w = light._size[0];
-    double h = light._size[1];
-
-    double3 d = convertPositionToDirection(light._centroidPosition);
-
-    // convert to float
-    const double3& color = light._colorAverage;
-
-    // 1 JSON object per light
-    printf("{\n  \"direction\": [%f, %f, %f],\n", d[0], d[1], d[2]);
-    printf("  \"luminosity\": %f,\n", light._lumAverage);
-    printf("  \"color\": [%f, %f, %f],\n", color[0], color[1], color[2]);
-    printf("  \"area\": { \"x\": %f, \"y\": %f, \"w\": %f, \"h\": %f },\n", x, y, w, h);
-    printf("  \"sum\": %f,\n", light._sum);
-    printf("  \"lum_ratio\": %f,\n", light._sum);
-    printf("  \"error\": %d\n}\n", (light._error ? 1 : 0));
-}
-
 /**
  * A subregion in a SummedAreaTable.
  */
@@ -528,15 +483,14 @@ struct ExtractLights
 
         double ratioLengthSizeMax = 0.08;
         int errorMergeLight = mergeLights(mainLight, ratioLengthSizeMax, degreeMerge);
-        if (errorMergeLight)
-            printf("no main light found");
-        else
-            outputJSON(mainLight);
 
         sat.free();
         delete[] _regions;
         delete[] _lights;
         delete[] _mainLights;
+
+        // normalise light color
+        mainLight._colorAverage.normalize();
 
         return errorMergeLight;
     }

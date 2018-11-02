@@ -2,6 +2,7 @@
 #include "Cubemap.h"
 #include "CubemapMipMap.h"
 #include "Image.h"
+#include "Light.h"
 #include "io.h"
 
 #include <stdio.h>
@@ -87,16 +88,67 @@ int printImage(char* buffer, const ImageDescription& image)
     return size;
 }
 
-int printSpherical(char* buffer, Spherical& spherical)
+int printSpherical(char* buffer, const Spherical& spherical)
 {
     int size = 0;
 
-    size += sprintf(buffer + size, "    \"diffuseSPH\": [ %f, %f, %f", spherical[0], spherical[1], spherical[2]);
+    size += sprintf(buffer + size, "  \"diffuseSPH\": [ %f, %f, %f", spherical[0], spherical[1], spherical[2]);
     for (int i = 1; i < NUM_SH_COEFFICIENT; ++i)
     {
         size += sprintf(buffer + size, ", %f, %f,%f", spherical[i * 3], spherical[i * 3 + 1], spherical[i * 3 + 2]);
     }
     size += sprintf(buffer + size, " ],\n");
+
+    return size;
+}
+
+double3 convertPositionToDirection(double2 position)
+{
+    double3 direction;
+    double x = position[0];
+    double y = position[1];
+
+    // https://www.shadertoy.com/view/4dsGD2
+    // Desmos math demonstration / check
+    // a,b,c => x,y,z direction axis
+    // https://www.desmos.com/calculator/2niuw1lpm5
+    double phi = (x * 2.0 * M_PI) - M_PI * 0.5;
+    double theta = (1.0 - y) * M_PI;
+
+    // Equation from http://graphicscodex.com  [sphry]
+    direction[0] = sin(theta) * cos(phi);
+    direction[1] = cos(theta);
+    direction[2] = sin(theta) * sin(phi);
+
+    // normalize direction
+    direction.normalize();
+    return direction;
+}
+
+int printLight(char* buffer, const Light& light)
+{
+    int size = 0;
+
+    double x = light._centroidPosition[0];
+    double y = light._centroidPosition[1];
+    double w = light._size[0];
+    double h = light._size[1];
+
+    double3 d = convertPositionToDirection(light._centroidPosition);
+
+    // convert to float
+    const double3& color = light._colorAverage;
+
+    // 1 JSON object per light
+    size += sprintf(buffer + size, "  \"light\": {\n");
+    size += sprintf(buffer + size, "    \"direction\": [%f, %f, %f],\n", d[0], d[1], d[2]);
+    size += sprintf(buffer + size, "    \"luminosity\": %f,\n", light._lumAverage);
+    size += sprintf(buffer + size, "    \"color\": [%f, %f, %f],\n", color[0], color[1], color[2]);
+    size += sprintf(buffer + size, "    \"area\": { \"x\": %f, \"y\": %f, \"w\": %f, \"h\": %f},\n", x, y, w, h);
+    size += sprintf(buffer + size, "    \"sum\": %f,\n", light._sum);
+    size += sprintf(buffer + size, "    \"lum_ratio\": %f,\n", light._sum);
+    size += sprintf(buffer + size, "    \"error\": %d\n", (light._error ? 1 : 0));
+    size += sprintf(buffer + size, "  },\n");
 
     return size;
 }
@@ -270,6 +322,7 @@ void Package::addBackground(const Cubemap& cm, ImageEncoding encoding)
 }
 
 void Package::setSpherical(Spherical* sph) { diffuseSPH = sph; }
+void Package::setMainLight(Light* lightOrg) { light = lightOrg; }
 
 void Package::write()
 {
@@ -279,6 +332,10 @@ void Package::write()
 
     int size = 0;
     size += sprintf(config, "{\n  \"version\": %d,\n", version);
+    if (light)
+    {
+        size += printLight(config + size, *light);
+    }
     size += printSpherical(config + size, *diffuseSPH);
     size += sprintf(config + size, "  \"textures\": [\n");
 
